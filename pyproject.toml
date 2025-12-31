@@ -1,0 +1,16 @@
+[project]
+name = "context-rca"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "drain3>=0.9.11",
+    "google-adk>=1.21.0",
+    "litellm>=1.80.11",
+    "networkx>=3.6.1",
+    "pandas>=2.3.3",
+    "pyarrow>=22.0.0",
+    "python-dotenv>=1.2.1",
+    "scikit-learn>=1.8.0",
+]

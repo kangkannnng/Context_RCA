@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Openai config
+context_rca/.env
+
+# Dataset
+data
+
+# Model
+models
+
+# adk
+context_rca/.adk
+.adk
+
+# old results
+old_results
