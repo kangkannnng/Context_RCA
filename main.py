@@ -31,10 +31,6 @@ load_dotenv(_env_path, override=False)
 USER_ID = "user"
 APP_NAME = "context_rca"
 
-# 运行模式: single | batch | random
-RUN_MODE = "random" 
-RANDOM_COUNT = 1  # random 模式下随机抽取的条目数
-
 LOG_DIR = "logs"
 
 # 基础日志配置 (控制台只输出 INFO)
@@ -223,8 +219,8 @@ async def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="Context-RCA Runner")
     parser.add_argument("--batch", action="store_true", help="Run in batch mode (process all items)")
-    parser.add_argument("--random", type=int, default=1, help="Run in random mode with N items (default: 1)")
-    parser.add_argument("--single", action="store_true", help="Run in single mode (first item only)")
+    parser.add_argument("--random", type=int, default=0, help="Run in random mode with N items")
+    parser.add_argument("--single", type=int, default=1, help="Run in single mode (process the N-th item, 1-based index, default: 1)")
     args = parser.parse_args()
 
     project_root = os.getenv("PROJECT_DIR", ".")
@@ -245,13 +241,19 @@ async def main():
     if args.batch:
         logger.info(f"[Batch Mode] Processing all {len(items)} items...")
         selected_items = items
-    elif args.single:
-        logger.info("[Single Mode] Selecting first item...")
-        selected_items = items[:1]
-    else: # default to random
+    elif args.random > 0:
         count = min(args.random, len(items))
         logger.info(f"[Random Mode] Selecting {count} random items...")
         selected_items = random.sample(items, count)
+    else:
+        # Default to Single Mode
+        idx = args.single - 1 # Convert 1-based to 0-based
+        if 0 <= idx < len(items):
+            logger.info(f"[Single Mode] Selecting item #{args.single} (UUID: {items[idx].get('uuid')})...")
+            selected_items = [items[idx]]
+        else:
+            logger.error(f"Index {args.single} out of range (1-{len(items)})")
+            return
 
     runner = RCARunner(output_path)
     await runner.run_batch(selected_items)

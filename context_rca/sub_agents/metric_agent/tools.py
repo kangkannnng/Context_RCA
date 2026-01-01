@@ -1637,6 +1637,9 @@ def metric_analysis_tool(query: str, tool_context: ToolContext) -> dict:
         state["raw_metric_result"] = result
         state["metric_data_collected"] = True
 
+        # 存储node_pod_mapping到上下文中
+        state["node_pod_mapping"] = node_pod_mapping
+
         return result
         
     except Exception as e:

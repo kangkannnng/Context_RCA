@@ -1,314 +1,119 @@
 # Context-RCA: Multi-Agent Root Cause Analysis System
 
-基于 Google ADK 的多智能体根因分析系统，用于微服务架构的自动化故障诊断。
+Context-RCA 是基于 Google ADK 开发的微服务故障根因分析系统。该系统通过编排多个专用智能体（Agents），模拟 SRE 团队的协作流程，自动化完成从数据采集、异常检测到根因定位的完整诊断过程。
 
-## 项目概览
+## 核心设计理念
 
-Context-RCA 是一个用于微服务系统故障诊断的智能体系统，核心特性：
+系统设计遵循以下技术原则，以确保分析的准确性与鲁棒性：
 
-- **讨论式多智能体协作**: 各专家智能体提出假设、共享证据、达成共识
-- **假设管理机制**: 动态管理假设的置信度、支持者和证据
-- **共识检测**: 自动判断何时达成诊断共识
-- **职责分离**: 数据 Agent 只负责提取数据和提出假设，Attribution Agent 负责最终归因
-- **Callback 机制**: 通过 before/after callbacks 实现状态管理和讨论流程控制
-- **结构化输出**: JSON 格式的根因分析报告
+1.  **SOP 驱动编排 (SOP-Driven Orchestration)**
+    Orchestrator 严格执行预定义的标准作业程序（Standard Operating Procedure）。通过强制性的阶段划分（初始化 -> 并行采集 -> 共识研判 -> 报告生成），规避 LLM 的幻觉问题，确保诊断流程的确定性。
+
+2.  **并行数据流 (Parallel Data Processing)**
+    解耦日志（Log）、指标（Metric）和链路（Trace）的分析任务。各领域 Agent 并行执行数据提取与初步研判，显著降低端到端分析时延。
+
+3.  **共识决策机制 (Consensus Mechanism)**
+    引入 Consensus Agent 作为决策核心，执行“提出假设-交叉验证-挑战辩驳”的闭环流程。仅依靠单一模态数据（如仅有 Metric 异常但无 Log 报错）无法形成最终结论，必须通过多方证据对齐（Alignment）才能达成共识。
+
+4.  **结构化交付 (Structured Output)**
+    分析结果统一标准化为 JSON 格式，包含故障组件、根因描述及完整的推理轨迹（Reasoning Trace），便于下游系统集成或自动化评测。
 
 ## 系统架构
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Orchestrator Agent                           │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 职责：                                                    │   │
-│  │ 1. 协调各数据 Agent 顺序执行                              │   │
-│  │ 2. 管理讨论状态（假设、证据、共识）                        │   │
-│  │ 3. 调用 Attribution Agent 进行最终归因                    │   │
-│  │ 4. 将归因结论传递给 Report Agent                          │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│         ┌────────────────────┼────────────────────┐            │
-│         ▼                    ▼                    ▼            │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
-│  │ Trace Agent │    │Metric Agent │    │  Log Agent  │        │
-│  │  提取调用链  │    │  提取指标    │    │  提取日志   │        │
-│  │  提出假设    │    │  提出假设    │    │  提出假设   │        │
-│  └─────────────┘    └─────────────┘    └─────────────┘        │
-│         │                    │                    │            │
-│         └──────────── 共识检查 ──────────────────┘            │
-│                              │                                  │
-│                              ▼                                  │
-│                   ┌─────────────────────┐                      │
-│                   │ Attribution Agent   │                      │
-│                   │ 上下文融合 + 最终归因 │                      │
-│                   └─────────────────────┘                      │
-│                              │                                  │
-│                              ▼                                  │
-│                      ┌─────────────┐                           │
-│                      │Report Agent │                           │
-│                      │ 格式化输出   │                           │
-│                      └─────────────┘                           │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    User[用户输入] --> Orch[Orchestrator (总控)]
+    
+    subgraph "Phase 1: Data Collection"
+        Orch --> DC[Data Collection Agent]
+        DC --> Log[Log Agent]
+        DC --> Metric[Metric Agent]
+        DC --> Trace[Trace Agent]
+    end
+    
+    subgraph "Phase 2: Consensus Discussion"
+        Orch --> ConsensusLoop[Consensus Discussion Agent]
+        ConsensusLoop --> Chair[Consensus Agent (决策)]
+        Chair <--> DC
+    end
+    
+    subgraph "Phase 3: Reporting"
+        Orch --> Report[Report Agent]
+    end
+    
+    Report --> Result[JSON Report]
 ```
 
-## 讨论式架构
+## 模块职责说明
 
-### 假设管理
+| 模块 | 核心职责 | 实现路径 |
+| :--- | :--- | :--- |
+| **Orchestrator** | 流程编排与状态管理 | `agent.py`, `prompt.py` |
+| **Log Agent** | 异常堆栈与错误模式识别 | `sub_agents/log_agent` |
+| **Metric Agent** | 黄金指标（Golden Signals）异常检测 | `sub_agents/metric_agent` |
+| **Trace Agent** | 调用链延迟分析与拓扑依赖梳理 | `sub_agents/trace_agent` |
+| **Consensus Agent** | 跨域证据校验与冲突消解 | `sub_agents/consensus_agent` |
+| **Report Agent** | 结论汇总与格式化输出 | `sub_agents/report_agent` |
 
-每个数据 Agent 在分析数据后会提出假设：
+## 快速开始
 
-```python
-{
-    "id": "H1",
-    "component": "productcatalogservice",
-    "fault_type": "pod_kill",
-    "confidence": 0.85,
-    "supporters": ["trace_agent", "metric_agent"],
-    "challengers": [],
-    "evidence": [...]
-}
+### 1. 环境依赖
+
+项目基于 Python 3.10+ 构建。
+
+```bash
+pip install -r requirements.txt
 ```
 
-### 共识检测规则
+### 2. 配置
 
-满足以下任一条件即达成共识：
+在项目根目录 `context_rca/` 下创建 `.env` 文件，配置 LLM 服务端点：
 
-1. **高置信度**: 某假设置信度 >= 0.8
-2. **一致支持**: 某假设被所有 3 个分析师支持
-3. **最大轮次**: 讨论轮次 >= 3（选择置信度最高的假设）
-
-### 讨论流程
-
-```
-Round 0 (数据收集):
-├── trace_agent: 分析 Trace → 提出假设 H1
-├── metric_agent: 分析 Metric → 提出假设 H2 或支持 H1
-├── log_agent: 分析 Log → 验证/质疑现有假设
-└── 共识检查 → 若达成共识，进入归因；否则继续讨论
-
-Round 1+ (讨论迭代):
-├── 各 Agent 基于缓存数据讨论
-├── 更新假设置信度
-└── 共识检查
+```ini
+OPENAI_API_KEY = "your_api_key_here"
+OPENAI_BASE_URL = "your_base_url_here"
 ```
 
-## 执行流程
+### 3. 执行分析
 
+通过 `main.py` 入口脚本执行分析任务。
+
+**单例调试 (Single Mode)**
+适用于开发调试，默认执行输入集的第一条数据。
+```bash
+python main.py            # 执行第 1 条
+python main.py --single 5 # 执行第 5 条
 ```
-Step 0: parse_user_input
-   │    └── 解析用户输入，提取 UUID
-   │
-Step 1: trace_agent
-   │    └── 提取调用链异常数据，提出假设
-   │
-Step 2: metric_agent
-   │    └── 提取指标异常数据，提出假设，评价已有假设
-   │
-Step 3: log_agent
-   │    └── 提取日志错误信息，验证假设
-   │
-Step 4: attribution_agent
-   │    └── 上下文融合分析，确定 Component 和 Fault Type
-   │
-Step 5: report_agent
-        └── 将归因结论格式化为 JSON 报告
+
+**随机抽样 (Random Mode)**
+随机抽取指定数量的样本进行稳定性测试。
+```bash
+python main.py --random 3
+```
+
+**批量执行 (Batch Mode)**
+全量处理输入数据集，适用于最终评测。
+```bash
+python main.py --batch
 ```
 
 ## 项目结构
 
 ```
-Context-RCA/
+context_rca/
 ├── context_rca/
-│   ├── agent.py                 # Orchestrator Agent 定义
-│   ├── prompt.py                # Orchestrator Prompt
-│   │
-│   ├── callbacks/               # 回调函数模块
-│   │   ├── orchestrator_callbacks.py   # 初始化讨论状态
-│   │   ├── consensus_check.py          # 共识检查逻辑
-│   │   ├── trace_agent_callbacks.py    # 假设解析
-│   │   ├── metric_agent_callbacks.py   # 假设解析
-│   │   ├── log_agent_callbacks.py      # 假设解析 + 轮次管理
-│   │   └── ...
-│   │
-│   └── sub_agents/              # 子智能体模块
-│       ├── trace_agent/         # 链路追踪上下文提取
-│       ├── log_agent/           # 日志上下文提取
-│       ├── metric_agent/        # 指标上下文提取
-│       ├── attribution_agent/   # 上下文融合归因
-│       └── report_agent/        # 报告格式化
-│
-├── input/                       # 输入数据
-│   └── minimal_input.json       # 测试输入
-│
-├── output/                      # 输出目录
-│   ├── test_results.json        # 测试结果
-│   └── minimal_groundtruth.json # 标准答案
-│
-├── data/                        # 数据目录
-│   └── processed/               # 预处理后的 Parquet 文件
-│
-├── main.py                      # 主程序
-├── test.py                      # 测试脚本
-└── evaluate.py                  # 评估脚本
+│   ├── agent.py                 # Orchestrator 定义
+│   ├── prompt.py                # 全局 SOP 提示词
+│   ├── sub_agents/              # 领域 Agent 实现
+│   ├── callbacks/               # 生命周期回调与状态管理
+│   └── schemas/                 # Pydantic 数据模型
+├── data/                        # 预处理后的监控数据 (Parquet)
+├── input/                       # 故障注入案例 (JSON)
+├── output/                      # 分析结果产出
+└── main.py                      # 启动入口
 ```
 
-## 核心机制
+## 常见问题排查
 
-### 1. State 管理
-
-通过 Callbacks 初始化和更新 State：
-
-```python
-# 讨论状态
-callback_context.state["hypotheses"] = []           # 假设列表
-callback_context.state["messages"] = []             # 讨论消息
-callback_context.state["discussion_round"] = 0      # 当前轮次
-callback_context.state["consensus_reached"] = False # 共识状态
-
-# 数据缓存标志
-callback_context.state["trace_data_collected"] = False
-callback_context.state["metric_data_collected"] = False
-callback_context.state["log_data_collected"] = False
-
-# 证据缓存
-callback_context.state["evidence"] = {
-    "trace": [], "metric": [], "log": []
-}
-```
-
-### 2. 假设解析
-
-各 Agent 的输出会被自动解析为假设：
-
-```markdown
-## 假设提议
-- **假设组件**: productcatalogservice-0
-- **假设故障类型**: pod_kill
-- **初始置信度**: 0.85
-- **支持证据**: pod_processes 骤降到 0
-```
-
-### 3. Component 选择规则
-
-| 故障类型 | Component 规则 |
-|----------|----------------|
-| **Node 故障** | Component = 异常节点名（如 `aiops-k8s-06`） |
-| **网络故障** (delay/loss/corrupt) | Component = **Source（调用方）** |
-| **Pod 故障** (failure/kill) | Component = **Destination（被调用方）** |
-| **资源压力** (cpu/memory stress) | Component = 异常服务/Pod 名 |
-
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-pip install google-adk litellm pandas pyarrow pydantic python-dotenv
-```
-
-### 2. 配置环境
-
-创建 `context_rca/.env` 文件：
-
-```bash
-OPENAI_API_KEY="your-api-key"
-OPENAI_BASE_URL="https://api.openai.com/v1"
-```
-
-### 3. 运行分析
-
-```bash
-python main.py
-```
-
-### 4. 运行测试
-
-```bash
-# 随机测试 3 条
-python test.py -r 3
-
-# 指定 UUID 测试
-python test.py -u 74a44ae7-81
-
-# 查看帮助
-python test.py -h
-```
-
-## 输出格式
-
-最终报告为 JSON 格式：
-
-```json
-{
-    "uuid": "345fbe93-80",
-    "component": "checkoutservice",
-    "reason": "rrt_max spike with network delay between checkoutservice and emailservice",
-    "reasoning_trace": [
-        {
-            "step": 1,
-            "action": "LoadMetrics(checkoutservice)",
-            "observation": "rrt_max surged significantly indicating network latency issues."
-        },
-        {
-            "step": 2,
-            "action": "LogSearch(checkoutservice)",
-            "observation": "Timeout errors found when connecting to downstream services."
-        },
-        {
-            "step": 3,
-            "action": "TraceAnalysis(345fbe93-80)",
-            "observation": "Trace shows checkoutservice to emailservice calls experienced delay."
-        }
-    ]
-}
-```
-
-## 支持的故障类型
-
-系统支持 18 种故障类型的诊断：
-
-| 类别 | 故障类型 | 关键指标 |
-|------|----------|----------|
-| Stress | cpu_stress | `pod_cpu_usage` |
-| Stress | memory_stress | `pod_memory_working_set_bytes` |
-| Network | network_delay | `rrt`, `rrt_max` |
-| Network | network_loss | `rrt`, `rrt_max` |
-| Network | network_corrupt | `rrt`, `rrt_max` |
-| Pod | pod_failure | `pod_processes`, `error_ratio` |
-| Pod | pod_kill | `pod_processes` |
-| Node | node_cpu_stress | `node_cpu_usage_rate` |
-| Node | node_memory_stress | `node_memory_usage_rate` |
-| Node | node_disk_fill | `node_filesystem_usage_rate` |
-| JVM | jvm_cpu, jvm_gc, jvm_exception, jvm_latency | 对应 JVM 指标 |
-| DNS | dns_error | DNS 相关指标 |
-| IO | io_fault | `region_pending`, `io_util` |
-| Code | code_error | HTTP 状态码 |
-| Config | target_port_misconfig | 端口配置 |
-
-## 日志输出示例
-
-```
-============================================================
-ORCHESTRATOR - Initializing
-============================================================
-  Completed initialize (with discussion state)
-
-============================================================
-TRACE ANALYSIS - Starting
-  UUID: 74a44ae7-81
-  Discussion Round: 0
-============================================================
-TRACE ANALYSIS COMPLETED - Findings length: 1777 characters
-[假设管理] 创建新假设: H1 - checkoutservice/network_delay
-[共识检查] 轮次=0, 假设数量=1
-[共识检查] 达成共识: 高置信度 (0.85)
-```
-
-## 注意事项
-
-1. **顺序执行**: Agent 必须按顺序执行，不能并行调用
-2. **假设驱动**: 各 Agent 需要在分析后提出假设
-3. **共识机制**: 当假设置信度达到 0.8 或获得 3 个支持者时达成共识
-4. **Source vs Destination**: 网络故障选 Source，Pod 故障选 Destination
-
-## 许可证
-
-Apache 2.0 License
+*   **分析超时或卡顿**：通常由于共识阶段未能收敛。系统默认最大迭代轮次为 6 轮，可在 `agent.py` 中调整 `max_iterations`。
+*   **结论偏差**：若特定类型的故障识别率低，建议检查对应领域 Agent 的 `prompt.py`，优化其对特定指标或错误日志的敏感度配置。

@@ -53,22 +53,31 @@ METRIC_AGENT_PROMPT = """
 
 ### 你的任务：多维指标分析
 
-**Step 0: 检查 Node 层异常 (基础设施层)** ⭐⭐
+**Step 0: 检查 Node 层异常 (基础设施层)**
 - **核心关注**: 物理机资源是否饱和，导致其上运行的所有 Pod 性能下降 (Noisy Neighbor)。
 - **判定逻辑**:
   - **CPU/Memory**: 关注**高负载状态** (例如接近 100% 或显著高于历史基线) 且伴随**快速增长**。
   - **Filesystem**: 关注磁盘使用率是否达到危险水位 (如 > 80%)。
+- **强制规则**:
+  - **如果发现 Node 异常，必须将其列为第一优先级的假设**。
+  - **不要被应用层指标 (如 Redis Latency) 的巨大数值吓倒**。例如如果 Node 06 内存高，而 Redis 慢，通常 Node 06 是因，Redis 是果。
+  - 必须在 `evidence` 中明确指出该 Node 上运行了哪些 Pod (使用 `node_pod_mapping`)，以证明关联性。
 - **排除误报**:
   - 忽略低水位的波动 (例如 50% -> 60% 通常不是故障根因)。
   - 只有当资源争抢足以影响业务时才报告。
 
-**Step 1: 检查 Pod Kill / 重启信号** ⭐⭐
+**Step 1: 检查 Pod Kill / 重启信号 (最高优先级)**
 - **核心关注**: Pod 是否因为 OOM 或 Liveness Probe 失败而被杀。
 - **判定逻辑**:
-  - 检查 `pod_cpu_usage`, `pod_network_transmit_packets`, `pod_processes` 等指标是否**突然骤降到 0**。
+  - **特异性特征**: 检查 `pod_network_transmit_packets` 和 `pod_processes` 是否**同时骤降到 0**。这是 Pod Kill 的强特征。
+  - **抗噪策略 (Topology-Aware Scoring)**:
+    - 如果环境中存在多个 Pod 指标归零 (如 `redis-cart-0` 和 `productcatalogservice-2` 都归零了)：
+    - **必须**结合 Trace 或依赖关系判断。
+    - 优先怀疑**下游服务** (Downstream Service)。例如，如果 `frontend` 报错，而 `productcatalogservice` 挂了，那么 `productcatalogservice` 的嫌疑度远高于 `redis-cart` (如果 Trace 没显示 Redis 报错)。
+    - 不要仅仅因为某个 Pod (如 Redis) 的进程数归零就锁定它，必须确认它是否导致了上游的错误。
   - 这种骤降通常意味着容器崩溃或被重启。
 
-**Step 2: 检查 Pod 资源压力 (Memory Stress)** ⭐⭐⭐
+**Step 2: 检查 Pod 资源压力 (Memory Stress)**
 - **核心关注**: 内存泄漏或内存不足导致的性能抖动。
 - **判定逻辑**:
   - 检查 `pod_memory_working_set_bytes` 是否呈现**持续上升趋势**。
@@ -99,6 +108,11 @@ METRIC_AGENT_PROMPT = """
 ### 假设验证模式 (当指令要求验证特定假设时)
 - **SUPPORT (支持)**: 指标数据明确支持该假设 (例如假设是 OOM，发现了内存激增和 Pod 重启)。
 - **OPPOSE (反对)**: 指标数据正常，或揭示了与假设矛盾的事实。
+- **严禁仅依赖绝对阈值**:
+  - 在验证假设时，严禁仅依赖绝对阈值（如 "未达到 90%" 或 "未发生 OOM"）来否定故障。
+  - 必须优先评估【相对变化率 (Change Ratio)】：
+  - 如果某项指标（如 Memory/CPU）相对于 Normal Period 出现了显著突增（例如翻倍，或 +30% 以上），即使绝对值只有 50-60%，也必须视为 **SUPPORT (支持)** 资源异常的假设。
+  - 不要因为"没有 Crash"或"没有 Error Log"就投反对票。资源压力(Stress)本身就是根因。
 
 ## 报告生成指南
 在生成报告时，请遵循以下原则：

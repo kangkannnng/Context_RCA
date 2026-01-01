@@ -49,13 +49,26 @@ TRACE_AGENT_PROMPT = """
 - **延迟倍数计算**: 计算 `anomaly_avg_duration / normal_avg_duration`。
 - **Fast Fail 判定**: 如果延迟倍数 < 0.1 (即异常时比正常快10倍以上)，这通常意味着**连接被拒绝**或**熔断**，而非处理慢。此时应标记为 "Fast Fail"。
 - **Slow Response 判定**: 如果延迟倍数 > 2.0，标记为显著延迟。
+- **因果方向修正 (Causality Correction)**:
+  - **区分 Root Span 和 Symptom Span**:
+    - 当发现 Service A 调用 Service B 延迟极高时，请**优先检查 Service B 的健康状况**，而不是直接归因为 Service A。
+    - 如果 Service B 出现 Timeout 或 Connection Refused，Service B 是 Root Cause，Service A 只是 Symptom。
+  - 不要仅仅关注“总耗时最长”的 Span。
+  - 关注 **Self Duration** (自身耗时) 突增的 Span。如果一个服务总耗时增加，但主要是因为等待下游 (Wait time)，那么它只是受害者。
+  - 关注 **Error Start** (错误起始点)。错误链条中第一个报错的服务通常是根因。
 
-**Step 2: 拓扑末端定位 (Topology Analysis)**
-- **原则**: 故障通常在调用链的最末端。
-- **传递性判断**: 如果 A→B 慢，且 B→C 也慢，根据架构图，**C 是末端**，A 和 B 只是受害者。
-- **关键路径检查**:
-  - `checkoutservice` 慢？必须检查其下游 6 个服务。
-  - `recommendationservice` 慢？必须检查 `productcatalogservice`。
+**Step 2: 基于拓扑的根因定位策略 (Topology-based Root Cause Localization)**
+- **寻找最下游异常 (Find the Deepest Root)**:
+  - 如果 A 调用 B，且 A 和 B 都出现延迟/错误，**B 是根因，A 是受害者**。
+  - 参考架构：
+    - 若 `frontend` 和 `productcatalogservice` 同时慢 → 根因是 `productcatalogservice`。
+    - 若 `frontend` 和 `recommendationservice` 同时慢，请检查 `recommendationservice` 的下游（如 `productcatalogservice`）是否也慢。
+- **区分根因与症状 (Distinguish Root Cause vs Symptom)**:
+  - **Root Cause (根因)**: 调用链末端的服务，通常表现为 Timeout, Connection Refused, 或 5xx 错误。
+  - **Symptom (症状)**: 调用链上游的服务，通常表现为 Latency Spike (因为在等待下游响应)。
+- **特定路径检查**:
+  - 如果发现 `recommendationservice` 异常，请务必检查它对 `productcatalogservice` 的调用是否成功。这是架构中已知的关键依赖。
+  - **跨层级关联**: 如果发现某个下游服务 (如 `cartservice`) 也有延迟，即使它的延迟绝对值不如上游大，也要高度怀疑它。
 
 **Step 3: 错误归因 (Error Attribution)**
 - **DeadlineExceeded / Timeout**:
@@ -73,6 +86,16 @@ TRACE_AGENT_PROMPT = """
 - **假设验证模式**:
   - **SUPPORT**: Trace 数据显示该组件确实是慢调用的终点或错误的源头。
   - **OPPOSE**: 该组件在 Trace 中表现正常，或者它是受害者而非始作俑者。
+  - **同理心规则 (Empathy Rule for Client-Side Latency)**:
+    - 当验证的假设是 'Node X 故障' 或 'Service A (位于 Node X) 故障' 时：
+    - 1. 检查 Trace 中是否有涉及 Node X 或 Service A 的调用链。
+    - 2. 如果 Service A 调用了下游 Service B (如 Redis)，且 Service B 显示高延迟：
+      - 不要直接怪罪 Service B。
+      - 必须考虑：这是否是因为 Node X 的资源不足（CPU/Mem），导致 Service A 在发起请求或接收响应时出现了【调度延迟】或【计时误差】？
+    - 3. 判定标准：
+      - 如果下游 Service B 在其他健康路径中表现正常，或者只有来自 Node X 的请求变慢。
+      - 此时，Trace 证据应当被视为 **SUPPORT (支持)** Node X 故障的假设，而不是 OPPOSE。
+      - 理由填写："High latency in downstream [Service B] is likely a client-side symptom caused by resource starvation on parent [Node X]."
 
 ### 返回格式 (JSON)
 无论处于哪种模式，请务必严格遵守以下 JSON 格式：

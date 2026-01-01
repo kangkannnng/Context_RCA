@@ -17,14 +17,14 @@ ORCHESTRATOR_PROMPT = """
 
 #### Phase 2: 全量数据采集
 -   **前置条件**: UUID 校验通过。
--   **动作**: 调用 `data_collection_tool` 并行采集 Log、Metric 和 Trace 数据。
+-   **动作**: 调用 `data_collection_agent` 并行采集 Log、Metric 和 Trace 数据。
 -   **关键约束**:
     -   这是一个**阻塞性操作**。你**必须**等待工具返回明确的“成功”或“完成”状态后，才能进入下一阶段。
     -   严禁在数据未就绪时尝试进行分析。
 
 #### Phase 3: 多智能体专家会诊
 -   **前置条件**: 数据采集已完成 (Log/Metric/Trace 数据就绪)。
--   **动作**: 调用 `consensus_discussion_tool` 启动多轮讨论。
+-   **动作**: 调用 `consensus_discussion_agent` 启动多轮讨论。
 -   **目标**: 让 Log、Metric、Trace 三个领域的专家智能体交换证据，达成关于故障根因的共识。
 
 #### Phase 4: 报告生成与交付
