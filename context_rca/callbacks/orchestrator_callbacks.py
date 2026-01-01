@@ -4,11 +4,6 @@ from typing import Optional
 from google.adk.agents.callback_context import CallbackContext
 from google.genai import types
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-
 logger = logging.getLogger("RootCauseAnalysis")
 
 def before_orchestrator(callback_context: CallbackContext) -> Optional[types.Content]:
@@ -40,11 +35,22 @@ def before_orchestrator(callback_context: CallbackContext) -> Optional[types.Con
         state["raw_trace_result"] = "（等待写入...）"
     if "trace_data_collected" not in state:
         state["trace_data_collected"] = False
+
+    if "current_hypothesis" not in state:
+        state["current_hypothesis"] = "（等待写入...）"
+
+    # 初始化专家反馈变量，防止并行调用时的 KeyError
+    if "log_analysis_findings" not in state:
+        state["log_analysis_findings"] = "（等待数据收集...）"
+    if "metric_analysis_findings" not in state:
+        state["metric_analysis_findings"] = "（等待数据收集...）"
+    if "trace_analysis_findings" not in state:
+        state["trace_analysis_findings"] = "（等待数据收集...）"
     
     return None
 
 
-def after_orchestrator(callback_context: CallbackContext) -> str:
+def after_orchestrator(callback_context: CallbackContext) -> Optional[types.Content]:
     """Orchestrator 执行后处理"""
 
     state = callback_context.state

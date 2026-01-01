@@ -1,0 +1,74 @@
+[
+    {
+        "Anomaly Description": "Determine the root cause of the system fault during 2025-06-05T23:10:13Z to 2025-06-05T23:24:13Z.",
+        "uuid": "ef2a4fbb-87"
+    },
+    {
+        "Anomaly Description": "A fault occurred from 2025-06-05T19:10:07Z to 2025-06-05T19:33:07Z. Please identify the root cause.",
+        "uuid": "b1ab098d-83"
+    },
+    {
+        "Anomaly Description": "The system experienced an anomaly from 2025-06-06T21:10:18Z to 2025-06-06T21:22:18Z. Please infer the possible cause.",
+        "uuid": "462e3353-107"
+    },
+    {
+        "Anomaly Description": "A fault occurred from 2025-06-05T18:10:05Z to 2025-06-05T18:34:05Z. Please identify the root cause.",
+        "uuid": "38ee3d45-82"
+    },
+    {
+        "Anomaly Description": "A fault occurred from 2025-06-06T04:03:03Z to 2025-06-06T04:03:04Z. Please identify the root cause.",
+        "uuid": "0718e0f9-92"
+    },
+    {
+        "Anomaly Description": "The system experienced an anomaly from 2025-06-05T16:10:02Z to 2025-06-05T16:31:02Z. Please infer the possible cause.",
+        "uuid": "345fbe93-80"
+    },
+    {
+        "Anomaly Description": "A fault occurred from 2025-06-06T05:03:05Z to 2025-06-06T05:28:05Z. Please identify the root cause.",
+        "uuid": "31392fda-93"
+    },
+    {
+        "Anomaly Description": "Please analyze the abnormal event between 2025-06-05T21:10:10Z and 2025-06-05T21:23:10Z and provide the root cause.",
+        "uuid": "8a7a8a00-85"
+    },
+    {
+        "Anomaly Description": "Please analyze the abnormal event between 2025-06-05T17:10:04Z and 2025-06-05T17:33:04Z and provide the root cause.",
+        "uuid": "74a44ae7-81"
+    },
+    {
+        "Anomaly Description": "Please analyze the abnormal event between 2025-06-06T01:10:16Z and 2025-06-06T01:21:16Z and provide the root cause.",
+        "uuid": "5f904167-89"
+    },
+    {
+        "Anomaly Description": "A fault was detected from 2025-06-16T23:10:14Z to 2025-06-16T23:26:14Z. Please analyze its root cause.",
+        "uuid": "18b8cf77-318"
+    },
+    {
+        "Anomaly Description": "A fault was detected from 2025-06-06T06:03:07Z to 2025-06-06T06:24:07Z. Please analyze its root cause.",
+        "uuid": "20622318-94"
+    },
+    {
+        "Anomaly Description": "A fault occurred from 2025-06-06T09:03:13Z to 2025-06-06T09:15:13Z. Please identify the root cause.",
+        "uuid": "6ef260df-97"
+    },
+    {
+        "Anomaly Description": "A fault was detected from 2025-06-07T19:10:08Z to 2025-06-07T19:24:08Z. Please analyze its root cause.",
+        "uuid": "343ba04c-129"
+    },
+    {
+        "Anomaly Description": "A fault was detected from 2025-06-08T00:10:15Z to 2025-06-08T00:26:15Z. Please analyze its root cause.",
+        "uuid": "36937f85-134"
+    },
+    {
+        "Anomaly Description": "A fault was detected from 2025-06-16T16:10:02Z to 2025-06-16T16:26:02Z. Please analyze its root cause.",
+        "uuid": "50bce1c4-311"
+    },
+    {
+        "Anomaly Description": "Please analyze the abnormal event between 2025-06-17T00:10:15Z and 2025-06-17T00:32:15Z and provide the root cause.",
+        "uuid": "a42d2eb4-319"
+    },
+    {
+        "Anomaly Description": "Please analyze the abnormal event between 2025-06-16T22:10:12Z and 2025-06-16T22:15:12Z and provide the root cause.",
+        "uuid": "332adc3a-317"
+    }
+]

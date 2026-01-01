@@ -1,10 +1,15 @@
 """结构化根因分析报告"""
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ReasoningStep(BaseModel):
     """单个推理步骤，包含动作和观察结果。"""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "additionalProperties": False
+        }
+    )
     step: int = Field(description="步骤编号，从1开始")
     action: str = Field(
         description="执行的动作，格式如 'LoadMetrics(<component>)'、'LogSearch(<component>)'、'TraceAnalysis(<uuid>)'"
@@ -16,6 +21,11 @@ class ReasoningStep(BaseModel):
 
 class AnalysisReport(BaseModel):
     """根因分析报告的输出格式，用于比赛提交。"""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "additionalProperties": False
+        }
+    )
     uuid: str = Field(description="故障案例的唯一标识符，如 '345fbe93-80'")
     component: str = Field(
         description="""根因组件名称:

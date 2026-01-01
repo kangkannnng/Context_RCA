@@ -983,19 +983,21 @@ def trace_analysis_tool(query: str, tool_context: ToolContext) -> dict:
             return result
 
         # 调用 _load_filtered_trace 获取trace数据
-        filtered_traces_csv, trace_unique_dict, status_combinations_csv = _load_filtered_trace(df_input_timestamp, matched_index)
-
-        if filtered_traces_csv is None:
-            # 加载过程中出错
+        load_result = _load_filtered_trace(df_input_timestamp, matched_index)
+        
+        if load_result is None:
+             # 加载过程中出错
             result = {
                 "status": "error",
-                "message": f"加载trace数据失败。UUID: {matched_row['uuid']}",
+                "message": f"加载trace数据失败 (返回None)。UUID: {matched_row['uuid']}",
                 "filtered_traces": None,
                 "unique_entities": None,
                 "status_combinations": None,
                 "matched_anomaly": matched_row['Anomaly Description']
             }
             return result
+            
+        filtered_traces_csv, trace_unique_dict, status_combinations_csv = load_result
 
         if filtered_traces_csv == "":
             # 分析成功但没有检测到异常

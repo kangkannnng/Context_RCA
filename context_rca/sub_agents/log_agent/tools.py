@@ -419,18 +419,20 @@ def log_analysis_tool(query: str, tool_context: ToolContext) -> dict:
             }
             return result
 
-        filtered_logs_csv, log_unique_dict = _load_filtered_log(df_input_timestamp, matched_index)
-
-        if filtered_logs_csv is None:
-            # 加载过程中出错
+        load_result = _load_filtered_log(df_input_timestamp, matched_index)
+        
+        if load_result is None:
+             # 加载过程中出错
             result = {
                 "status": "error",
-                "message": f"加载日志数据失败。UUID: {matched_row['uuid']}",
+                "message": f"加载日志数据失败 (返回None)。UUID: {matched_row['uuid']}",
                 "filtered_logs": None,
                 "unique_entities": None,
                 "matched_anomaly": matched_row['Anomaly Description']
             }
             return result
+
+        filtered_logs_csv, log_unique_dict = load_result
         
         if filtered_logs_csv == "":
             # 分析成功但没有错误日志

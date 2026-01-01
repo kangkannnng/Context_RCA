@@ -12,13 +12,28 @@ def before_trace_analysis(callback_context: CallbackContext) -> Optional[types.C
     logger.info("=" * 60)
 
     state = callback_context.state
-    
-    state["current_task_instruction"] = "请对 Trace 数据进行全面扫描，找出最显著的异常。"
 
+    if state.get("trace_data_collected", False):
+        current_hypothesis = state.get("current_hypothesis")
+        logger.info(f"TRACE AGENT - Verifying Hypothesis: {current_hypothesis[:30]}...")
+        state["current_task_instruction"] = (
+            f"当前处于【假设验证阶段】。\n"
+            f"待验证的根因假设是：'{current_hypothesis}'。\n"
+            f"请基于 Trace 数据判断该假设是否成立。\n"
+            f"重点：请在返回 JSON 的 'stance' 字段中明确标记 'SUPPORT' 或 'OPPOSE'。"
+        )
+    else:
+        logger.info("TRACE AGENT - Initial Scanning")
+        state["current_task_instruction"] = (
+            "当前处于【初始扫描阶段】。\n"
+            "请对 Trace 数据进行全面扫描，找出所有显著的异常调用链。\n"
+            "重点：请在返回 JSON 的 'stance' 字段中标记 'NEUTRAL'，并在 'hypotheses' 中列出你的发现。"
+        )
+    
     return None
 
 
-def after_trace_analysis(callback_context: CallbackContext) -> str:
+def after_trace_analysis(callback_context: CallbackContext) -> Optional[types.Content]:
     """Trace分析后的回调函数"""
     state = callback_context.state
 
