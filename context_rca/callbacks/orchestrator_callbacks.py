@@ -36,10 +36,11 @@ def before_orchestrator(callback_context: CallbackContext) -> Optional[types.Con
     if "trace_data_collected" not in state:
         state["trace_data_collected"] = False
 
+    if "current_iteration" not in state:
+        state["current_iteration"] = 0
     if "current_hypothesis" not in state:
         state["current_hypothesis"] = "（等待写入...）"
 
-    # 初始化专家反馈变量，防止并行调用时的 KeyError
     if "log_analysis_findings" not in state:
         state["log_analysis_findings"] = "（等待数据收集...）"
     if "metric_analysis_findings" not in state:

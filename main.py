@@ -102,7 +102,7 @@ class RCARunner:
         
         # 开启独立日志
         log_file = self.case_logger.start(uuid)
-        logger.info(f"▶▶▶ Processing {uuid} | Log: {log_file}")
+        logger.info(f"[Processing] {uuid} | Log: {log_file}")
         
         # 构建查询
         query_obj = {
@@ -160,7 +160,7 @@ class RCARunner:
         # 1. 工具调用
         if hasattr(event, 'get_function_calls'):
             for call in event.get_function_calls():
-                biz_logger.info(f"🛠️  [Tool Call] {call.name}")
+                biz_logger.info(f"[Tool Call] {call.name}")
                 biz_logger.info(f"    Args: {str(call.args)[:500]}...") # 记录更多参数细节
         
         # 2. 工具返回
@@ -168,7 +168,7 @@ class RCARunner:
             for resp in event.get_function_responses():
                 resp_str = str(resp.response)
                 preview = resp_str[:500] + "..." if len(resp_str) > 500 else resp_str
-                biz_logger.info(f"🔙 [Tool Resp] {resp.name}")
+                biz_logger.info(f"[Tool Resp] {resp.name}")
                 biz_logger.info(f"    Result: {preview}")
 
         # 3. 状态变更
@@ -176,12 +176,12 @@ class RCARunner:
             delta = event.actions.state_delta
             filtered_delta = {k: v for k, v in delta.items() if k not in ["uuid", "user_query"]}
             if filtered_delta:
-                biz_logger.info(f"💾 [State Update] {json.dumps(filtered_delta, ensure_ascii=False)}")
+                biz_logger.info(f"[State Update] {json.dumps(filtered_delta, ensure_ascii=False)}")
 
     def _log_state_summary(self, state: Dict[str, Any]):
         """记录最终状态摘要"""
         biz_logger = logging.getLogger("RootCauseAnalysis")
-        biz_logger.info("📊 [Final State Summary]")
+        biz_logger.info("[Final State Summary]")
         keys_to_show = ["current_hypothesis", "consensus_decision", "consensus_iteration"]
         for k in keys_to_show:
             if k in state:
@@ -193,7 +193,7 @@ class RCARunner:
         report_findings = state.get("report_analysis_findings")
         
         if report_findings and isinstance(report_findings, dict):
-            logger.info(f"✅ 从 Report Agent 获取到结构化报告")
+            logger.info(f"[Report Agent] Obtained structured report")
             return report_findings
 
         # 兜底逻辑
@@ -229,7 +229,7 @@ async def main():
 
     project_root = os.getenv("PROJECT_DIR", ".")
     input_path = os.path.join(project_root, "input", "minimal_input.json") 
-    output_path = os.path.join(project_root, "output", "minimal_result.jsonl")
+    output_path = os.path.join(project_root, "output", "result.jsonl")
     
     # 加载数据
     try:
@@ -243,14 +243,14 @@ async def main():
     selected_items = []
     
     if args.batch:
-        logger.info(f"📦 [Batch Mode] Processing all {len(items)} items...")
+        logger.info(f"[Batch Mode] Processing all {len(items)} items...")
         selected_items = items
     elif args.single:
-        logger.info("👤 [Single Mode] Selecting first item...")
+        logger.info("[Single Mode] Selecting first item...")
         selected_items = items[:1]
     else: # default to random
         count = min(args.random, len(items))
-        logger.info(f"🎲 [Random Mode] Selecting {count} random items...")
+        logger.info(f"[Random Mode] Selecting {count} random items...")
         selected_items = random.sample(items, count)
 
     runner = RCARunner(output_path)
