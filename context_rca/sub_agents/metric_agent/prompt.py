@@ -43,7 +43,7 @@ METRIC_AGENT_PROMPT = """
 | **Node** | `node_cpu_usage_rate`, `node_memory_usage_rate` | 物理机资源耗尽 (可能影响该节点上所有 Pod) |
 | **Node** | `node_filesystem_usage_rate` | 磁盘空间不足 (Disk Fill) |
 | **Pod** | `pod_cpu_usage`, `pod_memory_working_set_bytes` | **计算/内存瓶颈 (会导致代码执行慢)** |
-| **Pod** | `pod_processes` | 进程崩溃或重启 |
+| **Pod** | `pod_processes` | 进程崩溃或重启 (P99 > 1 是强信号) |
 | **Pod** | `pod_network_*` | 骤降到 0 = **Pod Kill 信号** ⭐ |
 | **Service** | `rrt` (Response Time), `rrt_max` | **网络/依赖响应慢** |
 | **Service** | `error_ratio` | 业务错误率升高 |
@@ -53,7 +53,32 @@ METRIC_AGENT_PROMPT = """
 
 ### 你的任务：多维指标分析
 
-**Step 0: 检查 Node 层异常 (基础设施层)**
+**Step 0: 异常实体排序 (Prioritization) - 黄金指标优先**
+- **核心任务**: 在深入分析前，必须先对所有异常实体进行排序，避免被微小的噪音误导。
+- **黄金指标优先级 (Golden Signals Hierarchy)**:
+  1. **Traffic (流量突降)**: 如果某服务的 `request` 或 `response` 计数显著下降 (例如 -50% 或归零)，这是最高优先级的异常 (可能意味着配置错误、网络阻断或上游停止调用)。
+     - **特别检查**: 如果流量下降，务必检查 `port` 指标是否发生变化 (Target Port Misconfig)。
+  2. **Errors (错误率飙升)**: `error_ratio` 或 `client_error` 的激增。
+  3. **Latency (延迟增加)**: `rrt` 变慢。
+  4. **Saturation (资源饱和)**: CPU/Memory/Disk 的波动。
+- **排序逻辑**:
+  - **Traffic/Errors > Saturation**: 严禁因为 Node 磁盘或 CPU 的微小波动 (如 40%->50%) 而忽略了 Service 流量减半 (Traffic Drop) 的事实。
+  - **Top 3 原则**: 优先报告流量跌幅最大、错误率最高的 Top 3 服务。
+  - **绝对值权重 (Absolute Value Check)**: 
+    - **Contextualize Magnitude**: 资源使用率的增长倍数很大，但最终绝对值仍然很低 (例如 Memory < 100MB, CPU < 10%)，请将其视为**噪音**或**低优先级**，除非有明确的 Error 伴随。
+    - *Example*: 内存从 1MB 涨到 8MB (700% 增长) 在数学上很大，但在运维上微不足道。不要将其标记为 Root Cause，除非它超过了安全阈值 (如 >80% limit)。
+    - 如果 Service A 的 `error_ratio` 是 23.4%，而 Service B (如 Redis) 是 2.39%。
+    - **必须**将 Service A 列为主要嫌疑对象。
+    - **严禁**因为 Service B 是基础组件（如 Redis/DB）就过度放大其微小波动的权重。基础组件的轻微报错往往是上游流量异常导致的副作用。
+
+  - **Throughput Drop vs Network Failure**:
+    - **Rule**: 如果吞吐量 (Throughput, e.g., `transmit_packets`) 跌零，但错误率 (Error Rate) 或丢包数 (Packet Drops) **未上升**。
+    - **Conclusion**: 假设应用处于**空闲 (Idle)** 或 **被阻塞 (Blocked)** 状态，**严禁**将其归因为网络故障 (Network Failure)。网络故障通常伴随着 Error 或 Drop 的飙升。
+  - **Critical DB IO**:
+    - **Rule**: 任何 Database IO Utilization, Replication Lag, 或 Pending Requests 的异常都必须视为 **CRITICAL** 级别的根因候选。
+    - **Reason**: 数据库 IO 问题会产生全局影响 (Global Impact)，导致所有依赖服务变慢。
+
+**Step 1: 检查 Node 层异常 (基础设施层)**
 - **核心关注**: 物理机资源是否饱和，导致其上运行的所有 Pod 性能下降 (Noisy Neighbor)。
 - **判定逻辑**:
   - **CPU/Memory**: 关注**高负载状态** (例如接近 100% 或显著高于历史基线) 且伴随**快速增长**。
@@ -77,12 +102,19 @@ METRIC_AGENT_PROMPT = """
     - 不要仅仅因为某个 Pod (如 Redis) 的进程数归零就锁定它，必须确认它是否导致了上游的错误。
   - 这种骤降通常意味着容器崩溃或被重启。
 
-**Step 2: 检查 Pod 资源压力 (Memory Stress)**
-- **核心关注**: 内存泄漏或内存不足导致的性能抖动。
+**Step 2: 检查 Pod 资源压力 (Memory Stress & CPU Stress)**
+- **核心关注**: 内存泄漏、CPU 饱和或异常进程派生。
 - **判定逻辑**:
-  - 检查 `pod_memory_working_set_bytes` 是否呈现**持续上升趋势**。
-  - 关注**显著的相对增长** (例如翻倍) 或**接近限制值**。
-  - **特例关注**: `shippingservice-0` 等已知敏感组件的内存波动往往是关键线索。
+  - **CPU Stress / Fork Bomb**:
+    - 如果 `pod_cpu_usage` 飙升，且 **`pod_processes` 显著增加** (例如从 1 变 10+)，这是 **CPU Stress Test** 或 **Fork Bomb** 的典型特征。
+    - **注意**: 这里的 `pod_processes` 指的是单 Pod 内部的进程数，不是 Pod 副本数。不要将其误判为 Scaling (HPA)。
+  - **Memory Stress**:
+    - 检查 `pod_memory_working_set_bytes` 是否呈现**持续上升趋势**。
+    - 关注**显著的相对增长** (例如翻倍) 或**接近限制值**。
+    - **特例关注**: `shippingservice-0` 等已知敏感组件的内存波动往往是关键线索。
+  - **Process Spawning (进程派生)**:
+    - **Context Knowledge**: 在 Kubernetes 环境中，`pod_processes` 指标通常是 1。如果该指标在 CSV 中出现且 P99 > 1 (例如变为 2 或更多)，这通常意味着代码中出现了异常的进程派生 (Fork) 或压力测试工具的启动。
+    - **Analysis Guideline**: 当你看到 `pod_processes` 发生变化时，请给予它**高置信度**。这往往比 Node 级别的内存轻微波动 (<20% 的变化) 更直接地指向根因。
 - **排除误报**:
   - 区分正常的缓存增加与异常的内存泄漏。如果伴随 GC 频繁或响应变慢，则更可能是异常。
 
@@ -91,7 +123,34 @@ METRIC_AGENT_PROMPT = """
 - **验证**: 该服务的 Pod 是否有 CPU/Memory 飙升？(解释处理慢的原因)
 - **验证**: 该服务依赖的 DB (TiDB/Redis) 是否有 IO 或 CPU 异常？
 
-**Step 4: TiKV IO & 一致性检查**
+**Step 4: 网络层异常检测 (Network Layer Analysis)**
+- **核心关注**: 区分网络延迟与应用处理瓶颈。
+- **判定逻辑**:
+  - **核心诊断法则：区分“网络故障”与“应用/依赖阻塞” (Core Diagnostic Rule)**:
+    - 当你观察到服务的吞吐量/包量（Throughput/Packets）显著下降时，不要直接判定为“网络异常”，必须结合延迟（Latency/RRT）和错误率进行联合分析：
+    - **场景 A：网络层故障 (Network Infrastructure Fault)**
+      - **特征**: 吞吐量下降 + TCP 重传率 (Retransmit) 升高 + 网络接口丢包 (IfInErrors/IfOutDrops) > 0。
+      - **逻辑**: 路不通，数据包在尝试重发或被丢弃。
+    - **场景 B：应用/依赖阻塞 (Application/Dependency Stalling)**
+      - **特征**: 吞吐量下降 + 延迟 (RRT) 极高 + **网络层无明显重传/丢包报错**。
+      - **逻辑**: 应用线程被卡住（如等待 DNS 解析、等待数据库锁、死锁）。因为线程在等待，所以停止了发送新请求，导致网络包量自然下降。
+      - **判定**: 这通常是代码逻辑、DNS 解析或下游服务不可用导致的超时（Timeout）。
+      - **Action**: 当排除网络层故障（无重传），且看到高延迟+低吞吐时，如果无法定位具体下游（Trace缺失），应将根因范围锁定为 **‘外部依赖超时（如 DNS 或 第三方API）’**，而不是‘网络异常’。
+  - **关键指标关联**:
+    - 检查 `rrt` (Round Trip Time) 和 `pod_network_receive_bytes` / `pod_network_transmit_packets` 的关系。
+    - 如果 `rrt` 飙升而 `pod_network_transmit_packets` 下降 (丢包/重传)，这是典型的网络层故障特征。
+  - **Pod Kill 误判修正**:
+    - **Rule**: 不要假设 packet count 下降就意味着 Pod Crash/Kill，除非你同时看到 `restart_count` 增加或 `up` 状态变为 0。
+    - **Heuristic**:
+      - IF `rrt` is Extreme High (>10x) AND `packets` is Low -> **Network Congestion / Network Delay / Bandwidth Saturation** (The pipe is clogged).
+      - IF `rrt` is Normal/Timeout AND `packets` drops to 0 -> **Pod Crash / Service Down** (The pipe is empty).
+    - **Liveness Verification (存活验证)**:
+      - 当发现指标归零时，**必须**检查 `restart_count`。
+      - **Sudden Drop Logic**: 如果观察到网络流量或内存指标突然跌零（drop to zero），但在此之前并没有观察到 CPU 或 内存 的饱和（Saturation/Spike），这不是 Pod Crash，而是 **Network Loss** 或 **Monitoring Failure**。请直接报告为 'Network Anomaly'。
+      - 如果 `restart_count` **未增加**，但流量归零，这极大概率是 **Network Attack / Network Partition** 或 **Monitoring Failure**，而不是 Pod Crash。
+      - **严禁幻觉 (No Hallucination)**: 如果数据是 0 或下降，**严禁**编造 "Memory Spike" 或 "CPU Spike" 来强行解释 OOM。必须如实报告 "Metrics dropped to zero without resource spike"。
+
+**Step 5: TiKV IO & 一致性检查**
 - **核心关注**: 存储层瓶颈。
 - **判定逻辑**:
   - `region_pending` 的**剧烈波动** (数量级变化) 通常意味着 Raft 组在重新选举或迁移。
@@ -113,6 +172,7 @@ METRIC_AGENT_PROMPT = """
   - 必须优先评估【相对变化率 (Change Ratio)】：
   - 如果某项指标（如 Memory/CPU）相对于 Normal Period 出现了显著突增（例如翻倍，或 +30% 以上），即使绝对值只有 50-60%，也必须视为 **SUPPORT (支持)** 资源异常的假设。
   - 不要因为"没有 Crash"或"没有 Error Log"就投反对票。资源压力(Stress)本身就是根因。
+
 
 ## 报告生成指南
 在生成报告时，请遵循以下原则：

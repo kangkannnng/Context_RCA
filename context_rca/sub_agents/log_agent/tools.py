@@ -85,7 +85,8 @@ def _filter_logs_by_error(df: Optional[pd.DataFrame], column: str = 'message') -
     keywords = [
         'error', 'exception', 'fail', 'warn', 'critical', 'stress', 'timeout', 'refused', 
         'gc', 'garbage', 'heap', 'latency', 
-        'slow', 'backoff', 'retry', 'deadlock', 'unreachable', 'election'
+        'slow', 'backoff', 'retry', 'deadlock', 'unreachable', 'election',
+        'corrupt', 'checksum', 'malformed', 'truncated', 'crc'
     ]
     pattern = '|'.join(keywords)
     

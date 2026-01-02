@@ -9,6 +9,7 @@ import logging
 import random
 import argparse
 import uuid as uuid_lib
+import multiprocessing
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List
@@ -212,6 +213,30 @@ class RCARunner:
                 f.flush()
 
 # ============================================================
+# 多进程 Worker
+# ============================================================
+
+def process_item_worker(item, queue):
+    """Worker function for multiprocessing"""
+    try:
+        # Initialize runner
+        # We pass a dummy output path because we don't use run_batch inside the worker
+        runner = RCARunner(output_path="") 
+        
+        async def _run():
+            return await runner.run_one(item)
+            
+        result = asyncio.run(_run())
+        queue.put(result)
+    except Exception as e:
+        logging.getLogger("RootCauseAnalysis").error(f"Worker failed for {item.get('uuid')}: {e}", exc_info=True)
+        queue.put({
+            "uuid": item.get("uuid"),
+            "component": "ERROR",
+            "reason": f"Worker Exception: {str(e)}"
+        })
+
+# ============================================================
 # 入口
 # ============================================================
 
@@ -219,12 +244,13 @@ async def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="Context-RCA Runner")
     parser.add_argument("--batch", action="store_true", help="Run in batch mode (process all items)")
+    parser.add_argument("--workers", type=int, default=1, help="Number of workers for batch processing (default: 1)")
     parser.add_argument("--random", type=int, default=0, help="Run in random mode with N items")
-    parser.add_argument("--single", type=int, default=1, help="Run in single mode (process the N-th item, 1-based index, default: 1)")
+    parser.add_argument("--single", type=str, default="1", help="Run in single mode (process the N-th item (1-based index) or specific UUID, default: 1)")
     args = parser.parse_args()
 
     project_root = os.getenv("PROJECT_DIR", ".")
-    input_path = os.path.join(project_root, "input", "minimal_input.json") 
+    input_path = os.path.join(project_root, "input", "input.json") 
     output_path = os.path.join(project_root, "output", "result.jsonl")
     
     # 加载数据
@@ -247,16 +273,61 @@ async def main():
         selected_items = random.sample(items, count)
     else:
         # Default to Single Mode
-        idx = args.single - 1 # Convert 1-based to 0-based
-        if 0 <= idx < len(items):
-            logger.info(f"[Single Mode] Selecting item #{args.single} (UUID: {items[idx].get('uuid')})...")
-            selected_items = [items[idx]]
+        single_arg = args.single
+        
+        # Try to parse as index if it looks like an integer
+        if single_arg.isdigit():
+            idx = int(single_arg) - 1 # Convert 1-based to 0-based
+            if 0 <= idx < len(items):
+                logger.info(f"[Single Mode] Selecting item #{single_arg} (UUID: {items[idx].get('uuid')})...")
+                selected_items = [items[idx]]
+            else:
+                logger.error(f"Index {single_arg} out of range (1-{len(items)})")
+                return
         else:
-            logger.error(f"Index {args.single} out of range (1-{len(items)})")
-            return
+            # Treat as UUID
+            found_items = [item for item in items if item.get("uuid") == single_arg]
+            if found_items:
+                logger.info(f"[Single Mode] Selecting item with UUID: {single_arg}...")
+                selected_items = found_items
+            else:
+                logger.error(f"UUID {single_arg} not found in input items.")
+                return
 
-    runner = RCARunner(output_path)
-    await runner.run_batch(selected_items)
+    if args.workers > 1 and len(selected_items) > 1:
+        logger.info(f"[Batch Mode] Running with {args.workers} workers in parallel processes...")
+        
+        manager = multiprocessing.Manager()
+        queue = manager.Queue()
+        
+        # Start writer listener
+        pool = multiprocessing.Pool(processes=args.workers)
+        
+        # Use apply_async
+        for item in selected_items:
+            pool.apply_async(process_item_worker, args=(item, queue))
+            
+        pool.close()
+        
+        # Monitor queue and write to file
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "a", encoding="utf-8") as f:
+            finished_count = 0
+            total_count = len(selected_items)
+            
+            while finished_count < total_count:
+                # Blocking get
+                result = queue.get()
+                f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                f.flush()
+                finished_count += 1
+                logger.info(f"Progress: {finished_count}/{total_count}")
+                
+        pool.join()
+    else:
+        runner = RCARunner(output_path)
+        await runner.run_batch(selected_items)
 
 if __name__ == "__main__":
+    # python main.py --batch --workers 10
     asyncio.run(main())

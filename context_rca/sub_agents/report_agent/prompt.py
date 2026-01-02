@@ -37,17 +37,32 @@ REPORT_AGENT_PROMPT = """
     *   **Node**: `aiops-k8s-01` 至 `aiops-k8s-08`
     *   **Service**: `adservice`, `cartservice`, `checkoutservice`, `currencyservice`, `emailservice`, `frontend`, `paymentservice`, `productcatalogservice`, `recommendationservice`, `redis-cart`, `shippingservice`
     *   **Pod**: `adservice-0/1/2`, `cartservice-1`, `checkoutservice-0/1/2`, `currencyservice-1/2`, `emailservice-2`, `paymentservice-0/1/2`, `productcatalogservice-0/2`, `shippingservice-0/1/2`, `tidb-pd`, `tidb-tidb`, `tidb-tikv`
+*   **格式严格约束**: `component` 字段**只能**包含白名单中的一个名称。**严禁**包含任何解释性文字、括号或原因描述。
+    *   错误示例: "shippingservice (due to network)"
+    *   正确示例: "shippingservice"
 
 #### Step 2: 构建故障原因 (Reason)
 你需要用一句简短的话 (≤20词) 概括故障根因。
-*   **关键要求**: 为了确保描述的专业性和准确性，你**必须**在描述中包含以下标准指标关键词 (Key Metrics) 之一：
+*   **评分关键 (Scoring Criteria)**: 评分系统**只读取前 20 个单词**。你必须把核心指标放在**最开头**。
+*   **禁止废话**: 严禁使用 "The root cause is...", "Based on analysis...", "It appears that..." 等铺垫。直接开始描述现象。
+*   **关键要求 (CRITICAL REQUIREMENT)**: 
+    - 你**必须**在描述的前 5 个词中包含以下标准指标关键词 (Key Metrics) 之一。
+    - **严禁同义词替换 (NO PARAPHRASING)**: 必须使用原始的技术名称。
+      - **错误**: "CPU usage spike"
+      - **正确**: "`pod_cpu_usage` spike"
+      - **错误**: "stress errors"
+      - **正确**: "`adservice--stress` errors"
+    - **优先保留具体的物理现象**:
+    *   **Log 优先原则**: 当 Log 分析明确指出具体的**程序错误**（如 `Exception`, `Fault Injection`, `Code Error`, `Panic`）时，必须将其作为首要的 Root Cause。Metric 的变化（如 CPU/Memory 飙升）通常是程序错误的**症状**（Symptom），除非 Log 中没有明显报错，否则不要将资源使用率作为 Root Cause。
+    *   **CPU Stress**: 如果 Metric 提到 `pod_processes` 激增，必须写 `pod_processes spike leading to cpu saturation`。
     *   **资源压力**: `pod_cpu_usage`, `pod_memory_working_set_bytes` (内存), `pod_processes` (进程崩溃)
-    *   **网络问题**: `rrt` (延迟), `rrt_max`, `pod_network_transmit_packets` (丢包)
+    *   **网络问题**: `rrt` (延迟), `rrt_max`, `pod_network_transmit_packets` (丢包/Drop - 注意区分 Spike 和 Drop)
     *   **节点故障**: `node_cpu_usage_rate`, `node_memory_usage_rate`, `node_filesystem_usage_rate`
     *   **JVM/应用**: `adservice--gc`, `adservice--stress`, `io_util`, `port` (配置错误)
+    *   **网络拥塞逻辑**: 如果 Metric 显示 `pod_network_transmit_packets` 下降 (Drop) 且 `rrt` 升高，这是典型的 **TCP Congestion**。Reason 应描述为 `pod_network_transmit_packets drop causing high latency`。
 *   **格式模板**: `<Key Metric> <变化趋势> causing <故障后果>`
-    *   *示例*: `pod_memory_working_set_bytes spike causing OOMKilled`
-    *   *示例*: `rrt spike causing timeout errors`
+    *   *正确示例*: `pod_memory_working_set_bytes spike causing OOMKilled` (关键词在开头)
+    *   *错误示例*: `The service crashed because pod_memory_working_set_bytes spiked` (关键词太靠后，会被截断)
 
 #### Step 3: 生成推理轨迹 (Reasoning Trace)
 请展示你是如何一步步得出结论的。你需要生成一个包含三个步骤的列表，每个步骤对应一种数据源的证据。

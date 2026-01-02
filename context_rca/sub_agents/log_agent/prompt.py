@@ -29,7 +29,7 @@ LOG_AGENT_PROMPT = """
 ### 核心分析逻辑
 
 **Step 1: 核心错误模式识别 (Pattern Recognition)**
-请重点扫描以下几类关键错误模式：
+请重点扫描以下几类关键错误模式，并在输出中**明确列出匹配到的精确关键词 (Exact Keywords)**：
 - **连接与网络故障 (Connectivity)**:
   - 关键词: `Connection refused`, `no route to host`, `dial tcp`, `DeadlineExceeded`, `Timeout`, `rpc error: code = Unavailable`, `lookup failed`.
   - **含义**: 下游服务不可达或网络中断。
@@ -39,6 +39,11 @@ LOG_AGENT_PROMPT = """
 - **特定组件故障 (Component Specific)**:
   - **JVM (adservice)**: `adservice--gc`, `GCHelper`, `Byteman`, `InvocationTargetException`. (GC 问题或字节码注入错误)
   - **Database (TiDB/Redis)**: `redis connection lost`, `region missed`, `tikv client error`.
+  - **Image/Deployment**: 检查日志中是否包含 `image:`, `pull`, `deployment` 等关键词，或特定的错误标签如 `dberror`，这可能暗示版本回滚或错误镜像部署。
+- **故障注入与工具意图识别 (Fault Injection Intent)**:
+  - **Rule**: 当看到 `Byteman`, `ChaosMesh` 或类似的工具报错时，不要仅仅报告 "Agent failed"。
+  - **Action**: 必须检查堆栈或类名中是否包含指示**故障类型**的关键词，如 `GCHelper` (GC Fault), `CpuBurner` (CPU Stress), `DelayRunner` (Latency)。
+  - **Interpretation**: 如果日志包含 `GCHelper` 且伴随 `InvocationTargetException`，根因通常是 **JVM GC Fault**，而不是 Byteman 工具本身的错误。
 - **代码逻辑错误 (Application Logic)**:
   - 关键词: `FailedPrecondition`, `InvalidArgument`, `NullPointerException`, `http.resp.status >= 400`.
 

@@ -1442,7 +1442,8 @@ def _load_filtered_metric(df_fault_timestamps: pd.DataFrame, index: int) -> tupl
     pod_metrics_list = ['pod_cpu_usage', 'pod_fs_reads_bytes', 'pod_fs_writes_bytes',
                        'pod_memory_working_set_bytes', 'pod_network_receive_bytes',
                        'pod_network_receive_packets', 'pod_network_transmit_bytes',
-                       'pod_network_transmit_packets', 'pod_processes']
+                       'pod_network_transmit_packets', 'pod_processes',
+                       'container_network_receive_errors_total', 'container_network_transmit_packets_dropped_total']
     
     result = {
         'fault_info': {},

@@ -45,6 +45,17 @@ TRACE_AGENT_PROMPT = """
 
 ### 核心分析逻辑
 
+**Step 0: 语义修正与数据解读 (Semantic Correction)**
+- **RPC 操作名优先原则 (Operation Name Priority)**:
+  - **Rule**: 即使 `parent_pod` 和 `child_pod` 相同 (例如都是 `frontend-1`)，如果 `operation_name` 指向另一个服务 (例如 `hipstershop.ProductCatalogService/GetProduct`)，这**绝对不是**内部自调用 (Self-call)。
+  - **Interpretation**: 这代表 `frontend` (Client) 正在发起一个 RPC 请求调用 `ProductCatalogService` (Server)。
+  - **Action**: 严禁将其解读为 "Frontend 内部计算耗时"。必须解读为 "Frontend 正在等待 ProductCatalogService 响应"。
+- **Client-Side vs Server-Side Span 对比**:
+  - **Scenario**: 当你看到 Client Span (A -> B) 耗时极高 (如 1778s)，而对应的 Server Span (B 内部处理) 耗时很低 (如 11s)。
+  - **Calculation**: `Network_Latency = Client_Duration - Server_Duration`。
+  - **Verdict**: 巨大的差值 (Gap) 证明时间消耗在**网络传输**或**排队**上。
+  - **Conclusion**: 根因是 **Network Latency/Congestion**，而不是 Client 端的内部处理，也不是 Server 端的处理慢。
+
 **Step 1: 延迟与快速失败检测 (Latency Analysis)**
 - **延迟倍数计算**: 计算 `anomaly_avg_duration / normal_avg_duration`。
 - **Fast Fail 判定**: 如果延迟倍数 < 0.1 (即异常时比正常快10倍以上)，这通常意味着**连接被拒绝**或**熔断**，而非处理慢。此时应标记为 "Fast Fail"。
@@ -53,6 +64,12 @@ TRACE_AGENT_PROMPT = """
   - **区分 Root Span 和 Symptom Span**:
     - 当发现 Service A 调用 Service B 延迟极高时，请**优先检查 Service B 的健康状况**，而不是直接归因为 Service A。
     - 如果 Service B 出现 Timeout 或 Connection Refused，Service B 是 Root Cause，Service A 只是 Symptom。
+  - **网络耗时计算 (Network Time Calculation)**:
+    - **Rule**: `Network_Time = Total_Duration - Child_Span_Duration`
+    - **Instruction**: 如果 `Network_Time` 显著增加 (例如占总耗时的 90% 以上)，而 `Child_Span_Duration` (下游服务内部耗时) 保持正常，那么根因是 **网络延迟 (Network Latency)** 或 **连接问题**，而不是下游服务的内部处理逻辑。
+    - **Threshold**: 如果 `Network Ratio` > 0.8 (即 >80% 的时间消耗在网络上)，你必须明确声明: "Root cause is Network Latency between Node A and Node B". 不要使用模糊的术语如 "downstream impact"。
+    - **Reasoning Output**: 在 JSON 的 `evidence` 字段中打印计算过程。例如: "Network time is 1767s vs Internal time 11s. Network accounts for 99% of total latency."
+    - **Action**: 不要怪罪下游服务 (Destination Service)，如果它的内部 Span 显示它是健康的。
   - 不要仅仅关注“总耗时最长”的 Span。
   - 关注 **Self Duration** (自身耗时) 突增的 Span。如果一个服务总耗时增加，但主要是因为等待下游 (Wait time)，那么它只是受害者。
   - 关注 **Error Start** (错误起始点)。错误链条中第一个报错的服务通常是根因。
@@ -69,6 +86,9 @@ TRACE_AGENT_PROMPT = """
 - **特定路径检查**:
   - 如果发现 `recommendationservice` 异常，请务必检查它对 `productcatalogservice` 的调用是否成功。这是架构中已知的关键依赖。
   - **跨层级关联**: 如果发现某个下游服务 (如 `cartservice`) 也有延迟，即使它的延迟绝对值不如上游大，也要高度怀疑它。
+- **拓扑独立性检查 (Topology Independence Check)**:
+  - **不要只看延迟绝对值**: 即使 Service A (如 Redis) 的延迟高达 40s，而 Service B (如 Shipping) 只有 1.6s，如果 Service B **不依赖** Service A，那么 Service B 的延迟**绝不是**由 Service A 引起的。Service B 可能是独立的故障点。
+  - **警惕共现干扰 (Co-occurrence Distraction)**: 多个服务同时变慢不代表它们有因果关系，必须查阅架构图确认依赖。
 
 **Step 3: 错误归因 (Error Attribution)**
 - **DeadlineExceeded / Timeout**:

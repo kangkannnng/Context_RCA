@@ -25,6 +25,10 @@ ORCHESTRATOR_PROMPT = """
 #### Phase 3: 多智能体专家会诊
 -   **前置条件**: 数据采集已完成 (Log/Metric/Trace 数据就绪)。
 -   **动作**: 调用 `consensus_discussion_agent` 启动多轮讨论。
+-   **参数传递要求**:
+    -   你必须将 `data_collection_agent` 返回的所有结果完整地传递给 `consensus_discussion_agent`。
+    -   **必须包含**: `log_analysis_findings`, `metric_analysis_findings`, `trace_analysis_findings`。
+    -   **严禁遗漏**: 绝对不能只传递 Metric 的结果而忽略 Log 和 Trace。
 -   **目标**: 让 Log、Metric、Trace 三个领域的专家智能体交换证据，达成关于故障根因的共识。
 
 #### Phase 4: 报告生成与交付

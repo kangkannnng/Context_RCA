@@ -79,10 +79,11 @@ OPENAI_BASE_URL = "your_base_url_here"
 通过 `main.py` 入口脚本执行分析任务。
 
 **单例调试 (Single Mode)**
-适用于开发调试，默认执行输入集的第一条数据。
+适用于开发调试，默认执行输入集的第一条数据。支持按索引或 UUID 指定。
 ```bash
-python main.py            # 执行第 1 条
-python main.py --single 5 # 执行第 5 条
+python main.py                           # 执行第 1 条
+python main.py --single 5                # 执行第 5 条（1-based 索引）
+python main.py --single "your-uuid-here" # 按 UUID 执行指定条目
 ```
 
 **随机抽样 (Random Mode)**
@@ -104,12 +105,15 @@ context_rca/
 ├── context_rca/
 │   ├── agent.py                 # Orchestrator 定义
 │   ├── prompt.py                # 全局 SOP 提示词
+│   ├── tools.py                 # 公共工具函数
 │   ├── sub_agents/              # 领域 Agent 实现
 │   ├── callbacks/               # 生命周期回调与状态管理
 │   └── schemas/                 # Pydantic 数据模型
 ├── data/                        # 预处理后的监控数据 (Parquet)
 ├── input/                       # 故障注入案例 (JSON)
 ├── output/                      # 分析结果产出
+├── logs/                        # 运行日志 (按 Case 独立记录)
+├── models/                      # 模型相关文件
 └── main.py                      # 启动入口
 ```
 
