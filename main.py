@@ -54,18 +54,27 @@ class CaseLogger:
         self.file_handler = None
         self.logger = logging.getLogger("RootCauseAnalysis") # 绑定到业务 Logger
 
-    def start(self, uuid: str):
-        """开始记录：添加 FileHandler"""
+    def start(self, uuid: str, run_id: int = 1):
+        """开始记录：添加 FileHandler
+
+        Args:
+            uuid: case的UUID
+            run_id: 第几次运行 (1, 2, 3...)
+        """
+        # 按UUID创建子目录
+        case_dir = os.path.join(self.log_dir, uuid)
+        os.makedirs(case_dir, exist_ok=True)
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(self.log_dir, f"{timestamp}_{uuid}.log")
-        
+        log_file = os.path.join(case_dir, f"run{run_id}_{timestamp}.log")
+
         self.file_handler = logging.FileHandler(log_file, encoding='utf-8')
         self.file_handler.setLevel(logging.INFO) # 文件记录详细信息
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.file_handler.setFormatter(formatter)
-        
+
         self.logger.addHandler(self.file_handler)
-        self.logger.info(f"=== START SESSION: {uuid} ===")
+        self.logger.info(f"=== START SESSION: {uuid} (Run #{run_id}) ===")
         return log_file
 
     def stop(self):
@@ -92,14 +101,19 @@ class RCARunner:
         )
         self.case_logger = CaseLogger(LOG_DIR)
 
-    async def run_one(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        """运行单条分析"""
+    async def run_one(self, item: Dict[str, Any], run_id: int = 1) -> Dict[str, Any]:
+        """运行单条分析
+
+        Args:
+            item: 输入数据
+            run_id: 第几次运行 (用于日志区分)
+        """
         uuid = item.get("uuid", "unknown")
         session_id = f"session_{uuid_lib.uuid4().hex[:8]}"
-        
+
         # 开启独立日志
-        log_file = self.case_logger.start(uuid)
-        logger.info(f"[Processing] {uuid} | Log: {log_file}")
+        log_file = self.case_logger.start(uuid, run_id)
+        logger.info(f"[Processing] {uuid} (Run #{run_id}) | Log: {log_file}")
         
         # 构建查询
         query_obj = {
@@ -203,35 +217,53 @@ class RCARunner:
             "reason": hypothesis or text_resp,
         }
 
-    async def run_batch(self, items: List[Dict]):
+    async def run_batch(self, items: List[Dict], repeat: int = 1):
+        """批量运行分析
+
+        Args:
+            items: 输入数据列表
+            repeat: 每个case重复运行的次数
+        """
         os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
         # Append mode for safety
         with open(self.output_path, "a", encoding="utf-8") as f:
             for item in items:
-                result = await self.run_one(item)
-                f.write(json.dumps(result, ensure_ascii=False) + "\n")
-                f.flush()
+                uuid = item.get("uuid", "unknown")
+                for run_id in range(1, repeat + 1):
+                    if repeat > 1:
+                        logger.info(f"[Repeat Mode] {uuid} - Run {run_id}/{repeat}")
+                    result = await self.run_one(item, run_id)
+                    # 添加 run_id 到结果中便于区分
+                    result["run_id"] = run_id
+                    f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                    f.flush()
 
 # ============================================================
 # 多进程 Worker
 # ============================================================
 
-def process_item_worker(item, queue):
-    """Worker function for multiprocessing"""
+def process_item_worker(item, run_id, queue):
+    """Worker function for multiprocessing
+
+    Args:
+        item: 输入数据
+        run_id: 第几次运行 (1, 2, 3...)
+        queue: 结果队列
+    """
     try:
-        # Initialize runner
-        # We pass a dummy output path because we don't use run_batch inside the worker
-        runner = RCARunner(output_path="") 
-        
+        runner = RCARunner(output_path="")
+
         async def _run():
-            return await runner.run_one(item)
-            
+            return await runner.run_one(item, run_id)
+
         result = asyncio.run(_run())
+        result["run_id"] = run_id
         queue.put(result)
     except Exception as e:
-        logging.getLogger("RootCauseAnalysis").error(f"Worker failed for {item.get('uuid')}: {e}", exc_info=True)
+        logging.getLogger("RootCauseAnalysis").error(f"Worker failed for {item.get('uuid')} run {run_id}: {e}", exc_info=True)
         queue.put({
             "uuid": item.get("uuid"),
+            "run_id": run_id,
             "component": "ERROR",
             "reason": f"Worker Exception: {str(e)}"
         })
@@ -247,6 +279,7 @@ async def main():
     parser.add_argument("--workers", type=int, default=1, help="Number of workers for batch processing (default: 1)")
     parser.add_argument("--random", type=int, default=0, help="Run in random mode with N items")
     parser.add_argument("--single", type=str, default="1", help="Run in single mode (process the N-th item (1-based index) or specific UUID, default: 1)")
+    parser.add_argument("--repeat", type=int, default=1, help="Number of times to repeat each case (default: 1)")
     args = parser.parse_args()
 
     project_root = os.getenv("PROJECT_DIR", ".")
@@ -274,7 +307,7 @@ async def main():
     else:
         # Default to Single Mode
         single_arg = args.single
-        
+
         # Try to parse as index if it looks like an integer
         if single_arg.isdigit():
             idx = int(single_arg) - 1 # Convert 1-based to 0-based
@@ -294,27 +327,36 @@ async def main():
                 logger.error(f"UUID {single_arg} not found in input items.")
                 return
 
+    # 显示 repeat 模式信息
+    if args.repeat > 1:
+        logger.info(f"[Repeat Mode] Each case will run {args.repeat} times")
+        logger.info(f"[Repeat Mode] Logs will be saved to: logs/<uuid>/run1_*.log, run2_*.log, ...")
+        logger.info(f"[Repeat Mode] Total runs: {len(selected_items)} cases x {args.repeat} repeats = {len(selected_items) * args.repeat}")
+
     if args.workers > 1 and len(selected_items) > 1:
         logger.info(f"[Batch Mode] Running with {args.workers} workers in parallel processes...")
-        
-        manager = multiprocessing.Manager()
+
+        # 使用 spawn 而不是 fork，避免 asyncio event loop 冲突
+        ctx = multiprocessing.get_context('spawn')
+        manager = ctx.Manager()
         queue = manager.Queue()
-        
+
         # Start writer listener
-        pool = multiprocessing.Pool(processes=args.workers)
-        
-        # Use apply_async
+        pool = ctx.Pool(processes=args.workers)
+
+        # Use apply_async - 支持 repeat 参数
         for item in selected_items:
-            pool.apply_async(process_item_worker, args=(item, queue))
-            
+            for run_id in range(1, args.repeat + 1):
+                pool.apply_async(process_item_worker, args=(item, run_id, queue))
+
         pool.close()
-        
+
         # Monitor queue and write to file
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "a", encoding="utf-8") as f:
             finished_count = 0
-            total_count = len(selected_items)
-            
+            total_count = len(selected_items) * args.repeat  # 总任务数 = cases × repeat
+
             while finished_count < total_count:
                 # Blocking get
                 result = queue.get()
@@ -322,12 +364,14 @@ async def main():
                 f.flush()
                 finished_count += 1
                 logger.info(f"Progress: {finished_count}/{total_count}")
-                
+
         pool.join()
     else:
         runner = RCARunner(output_path)
-        await runner.run_batch(selected_items)
+        await runner.run_batch(selected_items, repeat=args.repeat)
 
 if __name__ == "__main__":
     # python main.py --batch --workers 10
+    # python main.py --single 1 --repeat 3  # 运行第1个case 3次
+    # python main.py --random 5 --repeat 3  # 随机选5个case，每个运行3次
     asyncio.run(main())

@@ -44,80 +44,97 @@ graph TD
     Report --> Result[JSON Report]
 ```
 
-## 模块职责说明
-
-| 模块 | 核心职责 | 实现路径 |
-| :--- | :--- | :--- |
-| **Orchestrator** | 流程编排与状态管理 | `agent.py`, `prompt.py` |
-| **Log Agent** | 异常堆栈与错误模式识别 | `sub_agents/log_agent` |
-| **Metric Agent** | 黄金指标（Golden Signals）异常检测 | `sub_agents/metric_agent` |
-| **Trace Agent** | 调用链延迟分析与拓扑依赖梳理 | `sub_agents/trace_agent` |
-| **Consensus Agent** | 跨域证据校验与冲突消解 | `sub_agents/consensus_agent` |
-| **Report Agent** | 结论汇总与格式化输出 | `sub_agents/report_agent` |
-
 ## 快速开始
 
-### 1. 环境依赖
+### 1. 环境准备
 
-项目基于 Python 3.10+ 构建。
+本项目使用 `uv` 进行依赖管理。
 
 ```bash
-pip install -r requirements.txt
+# 激活虚拟环境
+source .venv/bin/activate
+
+# 安装依赖
+uv sync
 ```
 
-### 2. 配置
+### 2. 配置环境变量
 
-在项目根目录 `context_rca/` 下创建 `.env` 文件，配置 LLM 服务端点：
+在 `context_rca/` 目录下创建 `.env` 文件，配置必要的 API Key 和其他设置：
 
-```ini
-OPENAI_API_KEY = "your_api_key_here"
-OPENAI_BASE_URL = "your_base_url_here"
-```
-
-### 3. 执行分析
-
-通过 `main.py` 入口脚本执行分析任务。
-
-**单例调试 (Single Mode)**
-适用于开发调试，默认执行输入集的第一条数据。支持按索引或 UUID 指定。
 ```bash
-python main.py                           # 执行第 1 条
-python main.py --single 5                # 执行第 5 条（1-based 索引）
-python main.py --single "your-uuid-here" # 按 UUID 执行指定条目
+# context_rca/.env
+OPENAI_API_KEY="sk-..."
+# 其他相关配置...
 ```
 
-**随机抽样 (Random Mode)**
-随机抽取指定数量的样本进行稳定性测试。
+### 3. 数据准备
+
+请确保数据文件放置在以下目录结构中：
+
+- **输入数据**: `input/input.json` (包含待分析的案例列表)
+- **原始数据**: `data/raw/YYYY-MM-DD/`
+- **处理后数据**: `data/processed/YYYY-MM-DD/` (包含 log-parquet, metric-parquet, trace-parquet)
+
+## 使用指南
+
+`main.py` 是系统的统一入口，支持多种运行模式。
+
+### 命令行参数
+
+| 参数 | 说明 | 示例 |
+| :--- | :--- | :--- |
+| `--batch` | **批量模式**：运行 `input.json` 中的所有案例 | `python main.py --batch` |
+| `--workers` | **并发数**：配合批量模式使用，指定并行进程数 | `python main.py --batch --workers 10` |
+| `--single` | **单例模式**：运行指定序号（从1开始）或 UUID 的案例 | `python main.py --single 1` 或 `python main.py --single "uuid-123"` |
+| `--random` | **随机模式**：随机抽取 N 个案例运行 | `python main.py --random 5` |
+
+### 运行示例
+
+**1. 运行单个案例（调试用）**
+运行输入文件中的第 1 个案例：
 ```bash
-python main.py --random 3
+python main.py --single 1
+```
+或者指定 UUID：
+```bash
+python main.py --single "a1b2c3d4"
 ```
 
-**批量执行 (Batch Mode)**
-全量处理输入数据集，适用于最终评测。
+**2. 批量运行所有案例（生产用）**
+使用 10 个 Worker 并行处理所有案例：
 ```bash
-python main.py --batch
+python main.py --batch --workers 10
+```
+> **注意**：批量运行时，结果会实时写入 `output/result.jsonl`，每个 Worker 的详细日志会保存在 `logs/` 目录下。
+
+**3. 随机抽样测试**
+随机抽取 5 个案例进行快速验证：
+```bash
+python main.py --random 5
 ```
 
 ## 项目结构
 
-```
-context_rca/
-├── context_rca/
-│   ├── agent.py                 # Orchestrator 定义
-│   ├── prompt.py                # 全局 SOP 提示词
-│   ├── tools.py                 # 公共工具函数
-│   ├── sub_agents/              # 领域 Agent 实现
-│   ├── callbacks/               # 生命周期回调与状态管理
-│   └── schemas/                 # Pydantic 数据模型
-├── data/                        # 预处理后的监控数据 (Parquet)
-├── input/                       # 故障注入案例 (JSON)
-├── output/                      # 分析结果产出
-├── logs/                        # 运行日志 (按 Case 独立记录)
-├── models/                      # 模型相关文件
-└── main.py                      # 启动入口
+```plaintext
+.
+├── main.py                 # 程序入口
+├── context_rca/            # 核心代码
+│   ├── agent.py            # Orchestrator 定义
+│   ├── sub_agents/         # 子智能体实现 (Log, Metric, Trace, Consensus, Report)
+│   ├── callbacks/          # 回调函数
+│   ├── schemas/            # 数据结构定义
+│   └── tools.py            # 通用工具
+├── data/                   # 数据目录
+│   ├── processed/          # 处理后的 Parquet 数据
+│   └── raw/                # 原始数据
+├── input/                  # 输入案例文件
+├── output/                 # 分析结果输出
+├── logs/                   # 运行日志
+└── models/                 # 辅助模型 (Drain3 等)
 ```
 
-## 常见问题排查
+## 输出说明
 
-*   **分析超时或卡顿**：通常由于共识阶段未能收敛。系统默认最大迭代轮次为 6 轮，可在 `agent.py` 中调整 `max_iterations`。
-*   **结论偏差**：若特定类型的故障识别率低，建议检查对应领域 Agent 的 `prompt.py`，优化其对特定指标或错误日志的敏感度配置。
+- **运行结果**: `output/result.jsonl` (JSON Lines 格式)
+- **详细日志**: `logs/YYYYMMDD_HHMMSS_{UUID}.log` (每个案例独立日志)

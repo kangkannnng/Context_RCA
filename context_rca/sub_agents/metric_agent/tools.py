@@ -1074,6 +1074,7 @@ def _convert_metrics_to_csv(metric_data: Dict, change_threshold: float = 0.05) -
 
     df_anomalies['score'] = df_anomalies.apply(calculate_score, axis=1)
     df_anomalies = df_anomalies.sort_values('score', ascending=False)
+    df_anomalies = df_anomalies.head(30)  # 只保留 Top 30，避免信息过载
     df_anomalies = df_anomalies.drop('score', axis=1)
     
     # 转换为 CSV
