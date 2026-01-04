@@ -280,11 +280,15 @@ async def main():
     parser.add_argument("--random", type=int, default=0, help="Run in random mode with N items")
     parser.add_argument("--single", type=str, default="1", help="Run in single mode (process the N-th item (1-based index) or specific UUID, default: 1)")
     parser.add_argument("--repeat", type=int, default=1, help="Number of times to repeat each case (default: 1)")
+    parser.add_argument("--input", type=str, default=None, help="Path to input JSON file")
+    parser.add_argument("--output", type=str, default=None, help="Path to output JSONL file")
+    parser.add_argument("--start", type=int, default=0, help="Start index (0-based) for batch processing")
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of items to process")
     args = parser.parse_args()
 
     project_root = os.getenv("PROJECT_DIR", ".")
-    input_path = os.path.join(project_root, "input", "input.json") 
-    output_path = os.path.join(project_root, "output", "result.jsonl")
+    input_path = args.input if args.input else os.path.join(project_root, "input", "input.json")
+    output_path = args.output if args.output else os.path.join(project_root, "output", "result.jsonl")
     
     # 加载数据
     try:
@@ -298,8 +302,14 @@ async def main():
     selected_items = []
     
     if args.batch:
-        logger.info(f"[Batch Mode] Processing all {len(items)} items...")
-        selected_items = items
+        start_idx = args.start
+        end_idx = start_idx + args.limit if args.limit is not None else len(items)
+        # Ensure bounds
+        end_idx = min(end_idx, len(items))
+        
+        logger.info(f"[Batch Mode] Processing items from index {start_idx} to {end_idx}...")
+        selected_items = items[start_idx:end_idx]
+        logger.info(f"[Batch Mode] Selected {len(selected_items)} items.")
     elif args.random > 0:
         count = min(args.random, len(items))
         logger.info(f"[Random Mode] Selecting {count} random items...")
