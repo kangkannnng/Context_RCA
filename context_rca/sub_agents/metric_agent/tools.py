@@ -1084,7 +1084,8 @@ def _convert_metrics_to_csv(metric_data: Dict, change_threshold: float = 0.05) -
     unique_dict = {
         'service_name': sorted(list(unique_services)),
         'node_name': sorted(list(unique_nodes)),
-        'pod_name': sorted(list(unique_pods))
+        'pod_name': sorted(list(unique_pods)),
+        'metric_name': sorted(list(df_anomalies['metric_name'].unique()))
     }
     
     return csv_string, unique_dict
@@ -1175,7 +1176,11 @@ def _get_tidb_services_files_mapping(date: str) -> Dict[str, Dict[str, str]]:
             'cpu_usage': f'infra_pd_cpu_usage_{date}.parquet',
             'memory_usage': f'infra_pd_memory_usage_{date}.parquet',
             'storage_used_ratio': f'infra_pd_storage_used_ratio_{date}.parquet',
-            'store_unhealth_count': f'infra_pd_store_unhealth_count_{date}.parquet'
+            'store_unhealth_count': f'infra_pd_store_unhealth_count_{date}.parquet',
+            'store_size': f'infra_pd_store_size_{date}.parquet',
+            'leader_count': f'infra_pd_leader_count_{date}.parquet',
+            'region_health': f'infra_pd_region_health_{date}.parquet',
+            'abnormal_region_count': f'infra_pd_abnormal_region_count_{date}.parquet'
         },
         'tidb-tikv': {
             'cpu_usage': f'infra_tikv_cpu_usage_{date}.parquet',
@@ -1186,7 +1191,9 @@ def _get_tidb_services_files_mapping(date: str) -> Dict[str, Dict[str, str]]:
             'raft_apply_wait': f'infra_tikv_raft_apply_wait_{date}.parquet',
             'rocksdb_write_stall': f'infra_tikv_rocksdb_write_stall_{date}.parquet',
             'io_util': f'infra_tikv_io_util_{date}.parquet',
-            'region_pending': f'infra_tikv_region_pending_{date}.parquet'
+            'region_pending': f'infra_tikv_region_pending_{date}.parquet',
+            'snapshot_apply_count': f'infra_tikv_snapshot_apply_count_{date}.parquet',
+            'block_cache_size': f'infra_tikv_block_cache_size_{date}.parquet'
         }
     }
 
@@ -1227,7 +1234,11 @@ def _get_tidb_core_metrics() -> Dict[str, List[str]]:
             'store_unhealth_count',  # Unhealth Store数量 - 异常指标
             'storage_used_ratio',  # 已用容量比 - 容量指标
             'cpu_usage',  # CPU使用率 - 资源使用
-            'memory_usage'  # 内存使用量 - 资源使用
+            'memory_usage',  # 内存使用量 - 资源使用
+            'store_size', # 存储大小
+            'leader_count', # Leader 数量
+            'region_health', # Region 健康度
+            'abnormal_region_count' # 异常 Region 数量
         ],
         'tidb-tikv': [
             'cpu_usage',  # CPU使用率 - 资源使用
@@ -1238,7 +1249,9 @@ def _get_tidb_core_metrics() -> Dict[str, List[str]]:
             'raft_apply_wait',  # RaftApply等待延迟P99 - 性能指标
             'rocksdb_write_stall',  # RocksDB写阻塞次数 - 关键异常指标
             'io_util',  # IO使用率 - 磁盘IO瓶颈
-            'region_pending'  # Pending Region数量 - Raft一致性异常
+            'region_pending',  # Pending Region数量 - Raft一致性异常
+            'snapshot_apply_count', # Snapshot 应用次数
+            'block_cache_size' # Block Cache 大小
         ]
     }
 
@@ -1641,6 +1654,9 @@ def metric_analysis_tool(query: str, tool_context: ToolContext) -> dict:
 
         # 存储node_pod_mapping到上下文中
         state["node_pod_mapping"] = node_pod_mapping
+        
+        # 存储 metric_name 列表到上下文中，供 Prompt 约束使用
+        state["available_metric_names"] = metric_unique_dict['metric_name']
 
         return result
         

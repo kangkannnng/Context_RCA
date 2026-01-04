@@ -79,24 +79,48 @@ User → Frontend (入口网关)
 **根因**: 被调方服务 (配置错误的那个)
 **关键词**: `port`, `request`, `response`
 
-### 模式3: Node 故障
-**特征**: Metric 显示 `node_*` 指标异常 (node_cpu_usage_rate, node_memory_usage_rate, node_filesystem_usage_rate)
-**根因**: Node 本身 (如 aiops-k8s-06)，不是运行在上面的 Pod/Service
-**关键词**: 使用 node 开头的指标名
+### 模式3: Node vs Pod 归因
+**特征**: Metric 显示 `node_*` 指标异常 (如 `node_memory_usage_rate` 高)
+**判定逻辑**:
+1. **Pod 闯祸**: 如果该 Node 上有一个 Pod 的资源使用率也同步飙升且占用巨大 -> 根因是该 **Pod** (如 `redis-cart-0`)。
+2. **Node 自身**: 如果 Node 资源高，但其上所有 Pod 资源使用平稳 -> 根因是 **Node** (如 `aiops-k8s-08`)。
+**关键词**: `node_memory_usage_rate`, `pod_memory_working_set_bytes`
 
-示例: aiops-k8s-08 内存耗尽导致 redis-cart 变慢
-- ❌ 错误: 根因是 redis-cart
-- ✅ 正确: 根因是 aiops-k8s-08
+示例: aiops-k8s-08 内存耗尽，且 redis-cart-0 内存同时也飙升
+- ❌ 错误: 根因是 aiops-k8s-08
+- ✅ 正确: 根因是 redis-cart-0 (Pod 内存泄漏导致 Node 耗尽)
 
 ### 模式4: 网络攻击 (Network Delay/Loss/Corrupt)
 **特征**: 两个服务之间的调用延迟剧增，`pod_network_*` 指标异常
 **根因**: 两个服务都可能是受害者，选择源服务或目标服务
 **关键词**: `rrt`, `rrt_max`, `pod_network_receive_bytes`, `pod_network_transmit_bytes`
 
-### 模式5: TiDB/IO 故障
-**特征**: Metric 显示 `io_util`, `region_pending` 异常
-**根因**: tidb-tikv 或 tidb-pd
+### 模式5: TiDB/IO 故障 (依赖归因)
+**特征**: Metric 显示 `io_util`, `region_pending` 异常，或者 Trace 显示调用 TiDB 慢
+**根因**: **必须**归因为 `tidb-tikv` 或 `tidb-pd`，严禁归因为上游调用方 (如 productcatalogservice)
+
+### 模式6: Pod 生命周期异常 (隐蔽故障)
+**特征**: Metric 显示 `pod_processes` 发生变化 (如 1.0 -> 2.0) 或 `restart_count` 增加
+**判定逻辑**:
+- 即使该 Pod 的 Error Ratio 不高，或者其他服务 (如 CartService) 的延迟看起来更严重 (10s+)，**必须优先**将根因归结为该 Pod。
+- **逻辑**: 进程数变化意味着 Pod 重启或 Crash，这是导致上游服务高延迟的根本原因。不要被上游的高延迟指标迷惑。
+**关键词**: `pod_processes`, `restart_count`
+
+示例: shippingservice-0 进程数变化，CartService 延迟 18s
+- ❌ 错误: 根因是 CartService (被延迟误导)
+- ✅ 正确: 根因是 shippingservice-0 (Pod 重启是根源)
 **关键词**: `io_util`, `region_pending`, `raft_apply_wait`
+
+### 模式6: Pod 级故障 (粒度仲裁) ⭐关键
+**特征**: Metric 专家报告显示**仅特定 Pod** (如 `shippingservice-0`) 指标异常，而同服务的其他 Pod 正常。
+**根因**: **必须**锁定为该特定 Pod (如 `shippingservice-0`)。
+**严禁**: 此时严禁归因为整个 Service (`shippingservice`)，否则视为误判。
+**关键词**: `pod_cpu_usage`, `pod_memory_working_set_bytes` (注意观察是否带编号)
+
+### 模式7: 杀信使 (Don't Shoot the Messenger)
+**特征**: 上游服务 (如 Frontend) 报 `DeadlineExceeded` 或 `Unavailable`，但 Trace 显示是下游服务 (如 AdService) 响应慢。
+**根因**: 下游服务 (AdService)。
+**原则**: 报错的服务往往是受害者，变慢的服务才是凶手。
 
 ---
 

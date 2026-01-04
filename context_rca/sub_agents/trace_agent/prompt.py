@@ -52,19 +52,19 @@ Frontend (入口)
 
 ### 关键发现提取规则
 `detected_trace_keys` 必须包含以下关键信息:
-- **延迟指标**: `latency_spike`, `timeout`, `slow_response`
-- **错误状态**: `connection_refused`, `deadline_exceeded`, `unavailable`
+- **延迟指标**: 必须使用标准指标名 `rrt` 或 `rrt_max` (表示响应时间/延迟增加)
+- **错误状态**: 必须使用标准指标名 `error_ratio` (表示错误率增加)
 - **调用关系**: 形如 `caller->callee` (如 `checkoutservice->paymentservice`)
 
 ### 输出格式 (JSON)
 ```json
 {
   "stance": "NEUTRAL" | "SUPPORT" | "OPPOSE",
-  "detected_trace_keys": ["latency_spike", "checkoutservice->paymentservice", "..."],
+  "detected_trace_keys": ["rrt_max", "checkoutservice->paymentservice", "..."],
   "hypotheses": [
     {
       "component": "异常组件名",
-      "reason": "异常原因 (引用 detected_trace_keys)",
+      "reason": "异常原因 (必须是 detected_trace_keys 中的标准指标名，如 rrt_max 或 error_ratio)",
       "evidence": "延迟数据或错误信息"
     }
   ]

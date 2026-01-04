@@ -29,19 +29,23 @@ REPORT_AGENT_PROMPT = """
 ### 2. 原因准确率 (40分) ⭐最重要
 - `reason` 字段**限长 20 词**，超出截断
 - **前 5 个词必须包含关键指标名或日志关键词**
+- **严禁**使用自然语言描述指标 (如 "high latency", "cpu spike", "network issue")，**必须**使用原始指标名。
 - 评分逻辑: 关键词匹配 > 语义相似度
 
 **关键词来源** (从专家分析中提取):
 - **Metric 关键词**: 从 `metric_analysis_findings` 的 `detected_metric_keys` 获取
-  - 如: `node_filesystem_usage_rate`, `pod_cpu_usage`, `rrt_max`
+  - **必须优先使用**: `rrt`, `rrt_max`, `pod_network_receive_bytes`, `pod_network_transmit_bytes`, `pod_cpu_usage`, `node_memory_usage_rate`
+  - 其他: `node_filesystem_usage_rate`, `pod_memory_working_set_bytes`
 - **Log 关键词**: 从 `log_analysis_findings` 的 `detected_log_keys` 获取
   - 如: `adservice--gc`, `OOMKilled`, `GCHelper`, `adservice--stress`
 - **Trace 关键词**: 从 `trace_analysis_findings` 的 `detected_trace_keys` 获取
-  - 如: `latency_spike`, `checkoutservice->paymentservice`, `deadline_exceeded`
+  - 如: `rrt_max`, `checkoutservice->paymentservice`, `deadline_exceeded`
 
 **reason 写法示例**:
-| 故障类型 | ❌ 低分写法 | ✅ 高分写法 |
+| 故障类型 | ❌ 低分写法 (自然语言) | ✅ 高分写法 (精确指标) |
 |---------|-----------|-----------|
+| 网络延迟 | high network latency | `rrt` and `rrt_max` spike causing communication delays |
+| 网络丢包 | packet loss issue | `pod_network_receive_packets` drop and `rrt` spike |
 | Node 磁盘 | disk is full | `node_filesystem_usage_rate` spike (54%→91%) causing disk exhaustion |
 | Node 内存 | memory issue | `node_memory_usage_rate` exhaustion at 95% on aiops-k8s-08 |
 | Node CPU | cpu overload | `node_cpu_usage_rate` saturation causing service degradation |

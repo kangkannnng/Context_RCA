@@ -282,9 +282,14 @@ async def main():
     parser.add_argument("--repeat", type=int, default=1, help="Number of times to repeat each case (default: 1)")
     parser.add_argument("--input", type=str, default=None, help="Path to input JSON file")
     parser.add_argument("--output", type=str, default=None, help="Path to output JSONL file")
+    parser.add_argument("--log-dir", type=str, default="logs", help="Directory to store logs")
     parser.add_argument("--start", type=int, default=0, help="Start index (0-based) for batch processing")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of items to process")
     args = parser.parse_args()
+
+    # Update global LOG_DIR based on args
+    global LOG_DIR
+    LOG_DIR = args.log_dir
 
     project_root = os.getenv("PROJECT_DIR", ".")
     input_path = args.input if args.input else os.path.join(project_root, "input", "input.json")
@@ -363,21 +368,29 @@ async def main():
 
         # Monitor queue and write to file
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        from tqdm import tqdm
+        total_count = len(selected_items) * args.repeat  # 总任务数 = cases × repeat
+        
         with open(output_path, "a", encoding="utf-8") as f:
             finished_count = 0
-            total_count = len(selected_items) * args.repeat  # 总任务数 = cases × repeat
-
-            while finished_count < total_count:
-                # Blocking get
-                result = queue.get()
-                f.write(json.dumps(result, ensure_ascii=False) + "\n")
-                f.flush()
-                finished_count += 1
-                logger.info(f"Progress: {finished_count}/{total_count}")
+            
+            # 使用 tqdm 显示进度条
+            with tqdm(total=total_count, desc="Processing Cases", unit="run") as pbar:
+                while finished_count < total_count:
+                    # Blocking get
+                    result = queue.get()
+                    f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                    f.flush()
+                    finished_count += 1
+                    pbar.update(1)
+                    # logger.info(f"Progress: {finished_count}/{total_count}") # 移除旧的日志输出，避免干扰进度条
 
         pool.join()
     else:
         runner = RCARunner(output_path)
+        # 如果是单进程模式，也可以加上简单的进度提示，但 RCARunner 内部是顺序执行的
+        # 这里为了简单，我们只在多进程模式加 tqdm，或者你可以修改 RCARunner.run_batch
         await runner.run_batch(selected_items, repeat=args.repeat)
 
 if __name__ == "__main__":
