@@ -224,7 +224,10 @@ class RCARunner:
             items: 输入数据列表
             repeat: 每个case重复运行的次数
         """
-        os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
+        dir_name = os.path.dirname(self.output_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+        
         # Append mode for safety
         with open(self.output_path, "a", encoding="utf-8") as f:
             for item in items:

@@ -24,3 +24,7 @@ context_rca/.adk
 
 # old results
 old_results
+
+# tmp files
+tmp
+logs_retest

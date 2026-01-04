@@ -1,140 +1,113 @@
 # Context-RCA: Multi-Agent Root Cause Analysis System
 
-Context-RCA 是基于 Google ADK 开发的微服务故障根因分析系统。该系统通过编排多个专用智能体（Agents），模拟 SRE 团队的协作流程，自动化完成从数据采集、异常检测到根因定位的完整诊断过程。
+Context-RCA 是一个基于大语言模型（LLM）和多智能体协作（Multi-Agent Collaboration）架构的微服务故障根因分析系统。它模拟了一支由资深 SRE 专家组成的“虚拟作战室”，通过严谨的 SOP（标准作业程序）和多轮辩论机制，自动化完成从现象发现、证据搜集到根因定性的全过程。
 
-## 核心设计理念
+## 🌟 核心设计亮点 (Design Philosophy)
 
-系统设计遵循以下技术原则，以确保分析的准确性与鲁棒性：
+### 1. 专家委员会机制 (Committee of Experts)
+不同于单一 Agent 的“全能模式”，我们设计了专职专责的专家角色：
+- **Metric Agent (指标专家)**: 专注于时序数据分析，擅长识别 `latency_spike` (延迟突增) 和 `error_ratio` (错误率) 异常，并能区分 Pod 重启 (`pod_processes`) 导致的次生灾害。
+- **Log Agent (日志专家)**: 深入日志堆栈，精准定位 `Error`、`Exception` 及关键的业务报错信息。
+- **Trace Agent (链路专家)**: 追踪分布式调用链，识别关键路径上的瓶颈服务。
+- **Consensus Agent (决策主席)**: 扮演“法官”角色，不直接处理原始数据，而是综合各方专家的“证词”，通过交叉验证（Cross-Validation）排除幻觉，形成最终判决。
 
-1.  **SOP 驱动编排 (SOP-Driven Orchestration)**
-    Orchestrator 严格执行预定义的标准作业程序（Standard Operating Procedure）。通过强制性的阶段划分（初始化 -> 并行采集 -> 共识研判 -> 报告生成），规避 LLM 的幻觉问题，确保诊断流程的确定性。
+### 2. 证据驱动的推理 (Evidence-Based Reasoning)
+系统拒绝“猜测”。所有的结论必须建立在确凿的证据链之上：
+- **多模态对齐**: 只有当 Metric 显示异常且 Log/Trace 提供佐证时，才会被认定为根因。
+- **因果链构建**: 能够识别“因”与“果”，例如：准确识别出 *CartService 的高延迟* 实际上是由 *ShippingService 的 Pod 重启* 引起的，从而避免误报。
 
-2.  **并行数据流 (Parallel Data Processing)**
-    解耦日志（Log）、指标（Metric）和链路（Trace）的分析任务。各领域 Agent 并行执行数据提取与初步研判，显著降低端到端分析时延。
+### 3. 鲁棒的分布式执行架构 (Robust Distributed Execution)
+为了应对大规模数据集的评测需求，我们设计了基于进程隔离的分布式运行器：
+- **进程级隔离**: 每个 Case 独立运行，互不干扰，彻底解决 LLM API 并发导致的线程安全问题。
+- **断点续传**: 支持失败重试和增量运行。
+- **实时监控**: 内置进度条与 ETA 预估，实时掌握大规模评测进度。
 
-3.  **共识决策机制 (Consensus Mechanism)**
-    引入 Consensus Agent 作为决策核心，执行“提出假设-交叉验证-挑战辩驳”的闭环流程。仅依靠单一模态数据（如仅有 Metric 异常但无 Log 报错）无法形成最终结论，必须通过多方证据对齐（Alignment）才能达成共识。
-
-4.  **结构化交付 (Structured Output)**
-    分析结果统一标准化为 JSON 格式，包含故障组件、根因描述及完整的推理轨迹（Reasoning Trace），便于下游系统集成或自动化评测。
-
-## 系统架构
+## 🏗️ 系统架构
 
 ```mermaid
 graph TD
-    User[用户输入] --> Orch[Orchestrator (总控)]
+    User[用户输入] --> Runner[Distributed Runner]
+    Runner -->|Spawn Process| Orch[Orchestrator]
     
-    subgraph "Phase 1: Data Collection"
-        Orch --> DC[Data Collection Agent]
-        DC --> Log[Log Agent]
+    subgraph "Virtual War Room"
+        Orch -->|SOP Phase 1| DC[Data Collection]
         DC --> Metric[Metric Agent]
+        DC --> Log[Log Agent]
         DC --> Trace[Trace Agent]
-    end
-    
-    subgraph "Phase 2: Consensus Discussion"
-        Orch --> ConsensusLoop[Consensus Discussion Agent]
-        ConsensusLoop --> Chair[Consensus Agent (决策)]
-        Chair <--> DC
-    end
-    
-    subgraph "Phase 3: Reporting"
-        Orch --> Report[Report Agent]
+        
+        Metric & Log & Trace -->|Evidence| Consensus[Consensus Agent]
+        Consensus -->|Challenge| Metric
+        Consensus -->|Challenge| Log
+        
+        Consensus -->|Final Verdict| Report[Report Agent]
     end
     
     Report --> Result[JSON Report]
 ```
 
-## 快速开始
+## 🚀 快速开始
 
 ### 1. 环境准备
 
-本项目使用 `uv` 进行依赖管理。
+本项目使用 `uv` 进行依赖管理，确保环境纯净。
 
 ```bash
-# 激活虚拟环境
-source .venv/bin/activate
-
 # 安装依赖
 uv sync
+
+# 激活环境
+source .venv/bin/activate
 ```
 
-### 2. 配置环境变量
+### 2. 配置
 
-在 `context_rca/` 目录下创建 `.env` 文件，配置必要的 API Key 和其他设置：
+在项目根目录创建 `.env` 文件：
 
 ```bash
-# context_rca/.env
 OPENAI_API_KEY="sk-..."
-# 其他相关配置...
+# 其他 LLM 相关配置
 ```
 
-### 3. 数据准备
+### 3. 运行指南
 
-请确保数据文件放置在以下目录结构中：
+#### 场景 A: 生产级批量评测 (推荐)
+使用我们全新设计的分布式运行器，稳定、高效地运行大规模测试集。
 
-- **输入数据**: `input/input.json` (包含待分析的案例列表)
-- **原始数据**: `data/raw/YYYY-MM-DD/`
-- **处理后数据**: `data/processed/YYYY-MM-DD/` (包含 log-parquet, metric-parquet, trace-parquet)
-
-## 使用指南
-
-`main.py` 是系统的统一入口，支持多种运行模式。
-
-### 命令行参数
-
-| 参数 | 说明 | 示例 |
-| :--- | :--- | :--- |
-| `--batch` | **批量模式**：运行 `input.json` 中的所有案例 | `python main.py --batch` |
-| `--workers` | **并发数**：配合批量模式使用，指定并行进程数 | `python main.py --batch --workers 10` |
-| `--single` | **单例模式**：运行指定序号（从1开始）或 UUID 的案例 | `python main.py --single 1` 或 `python main.py --single "uuid-123"` |
-| `--random` | **随机模式**：随机抽取 N 个案例运行 | `python main.py --random 5` |
-
-### 运行示例
-
-**1. 运行单个案例（调试用）**
-运行输入文件中的第 1 个案例：
 ```bash
+# 运行 input/failures_retest.json 中的所有案例
+# 结果输出到 output/retest_result_final.jsonl
+# 开启 10 个并发进程
+python run_distributed.py \
+    --input input/failures_retest.json \
+    --output output/retest_result_final.jsonl \
+    --workers 10 \
+    --log-base logs_retest
+```
+*特性：自动进度条、日志自动归档、支持 Ctrl+C 优雅退出。*
+
+#### 场景 B: 单个案例调试
+开发调试时，使用 `main.py` 快速运行单个 Case。
+
+```bash
+# 运行指定 UUID 的案例
+python main.py --single "31392fda-93-..."
+
+# 或者运行列表中的第 N 个案例
 python main.py --single 1
 ```
-或者指定 UUID：
-```bash
-python main.py --single "a1b2c3d4"
+
+## 📊 输出示例
+
+系统最终输出标准的 JSONL 格式，包含核心根因结论与完整的推理过程：
+
+```json
+{
+  "root_cause": "shippingservice",
+  "fault_type": "pod_restart",
+  "reasoning": "Metric Agent detected a restart in shippingservice-0 (pod_processes drop). Log Agent confirmed startup logs at the same timestamp. Although CartService showed high latency, it was identified as a downstream effect...",
+  "score": { ... }
+}
 ```
 
-**2. 批量运行所有案例（生产用）**
-使用 10 个 Worker 并行处理所有案例：
-```bash
-python main.py --batch --workers 10
-```
-> **注意**：批量运行时，结果会实时写入 `output/result.jsonl`，每个 Worker 的详细日志会保存在 `logs/` 目录下。
-
-**3. 随机抽样测试**
-随机抽取 5 个案例进行快速验证：
-```bash
-python main.py --random 5
-```
-
-## 项目结构
-
-```plaintext
-.
-├── main.py                 # 程序入口
-├── context_rca/            # 核心代码
-│   ├── agent.py            # Orchestrator 定义
-│   ├── sub_agents/         # 子智能体实现 (Log, Metric, Trace, Consensus, Report)
-│   ├── callbacks/          # 回调函数
-│   ├── schemas/            # 数据结构定义
-│   └── tools.py            # 通用工具
-├── data/                   # 数据目录
-│   ├── processed/          # 处理后的 Parquet 数据
-│   └── raw/                # 原始数据
-├── input/                  # 输入案例文件
-├── output/                 # 分析结果输出
-├── logs/                   # 运行日志
-└── models/                 # 辅助模型 (Drain3 等)
-```
-
-## 输出说明
-
-- **运行结果**: `output/result.jsonl` (JSON Lines 格式)
-- **详细日志**: `logs/YYYYMMDD_HHMMSS_{UUID}.log` (每个案例独立日志)
+---
+*Designed for SREs, by AI Agents.*

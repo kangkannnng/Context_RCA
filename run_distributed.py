@@ -6,6 +6,7 @@ import sys
 import shutil
 from math import ceil
 import time
+from tqdm import tqdm
 
 def main():
     parser = argparse.ArgumentParser(description="Run context_rca in distributed parallel processes")
@@ -47,6 +48,10 @@ def main():
     # Ensure output directory exists
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
 
+    # Create tmp directory
+    tmp_dir = "tmp"
+    os.makedirs(tmp_dir, exist_ok=True)
+
     # 2. Split and Launch
     for i in range(args.workers):
         start_idx = i * chunk_size
@@ -58,10 +63,12 @@ def main():
         chunk_data = data[start_idx:end_idx]
         
         # Define temporary paths
-        temp_input = f"temp_input_{i}.json"
-        temp_output = f"temp_output_{i}.jsonl"
-        temp_log_dir = f"{args.log_base}_{i}"
-        worker_log = f"worker_{i}.log" # Capture stdout/stderr here
+        temp_input = os.path.join(tmp_dir, f"temp_input_{i}.json")
+        temp_output = os.path.join(tmp_dir, f"temp_output_{i}.jsonl")
+        # Use the same log directory for all workers so all UUID folders end up in one place
+        # This ensures logs are organized by UUID in a single parent directory
+        temp_log_dir = args.log_base 
+        worker_log = os.path.join(tmp_dir, f"worker_{i}.log") # Capture stdout/stderr here
         
         temp_files.append({
             "input": temp_input,
@@ -98,13 +105,30 @@ def main():
     
     # 3. Monitor Loop
     try:
-        while True:
-            running = [p.poll() is None for p in processes]
-            if not any(running):
-                break
-            
-            # Simple spinner or status update could go here
-            time.sleep(2)
+        with tqdm(total=total_items, unit="case", desc="Overall Progress") as pbar:
+            while True:
+                running = [p.poll() is None for p in processes]
+                
+                # Calculate total processed so far by counting lines in output files
+                total_processed_count = 0
+                for temp in temp_files:
+                    out_file = temp["output"]
+                    if os.path.exists(out_file):
+                        try:
+                            with open(out_file, 'rb') as f:
+                                # Count lines efficiently
+                                total_processed_count += sum(1 for _ in f)
+                        except Exception:
+                            pass
+                
+                # Update progress bar
+                if total_processed_count > pbar.n:
+                    pbar.update(total_processed_count - pbar.n)
+                
+                if not any(running):
+                    break
+                
+                time.sleep(1)
             
     except KeyboardInterrupt:
         print("\nStopping all processes...")
@@ -152,6 +176,12 @@ def main():
                 os.remove(temp["worker_log"])
             # We don't delete the log directories as they contain valuable debug info
             # shutil.rmtree(temp["log_dir"], ignore_errors=True) 
+        
+        # Try to remove tmp directory if empty
+        try:
+            os.rmdir("tmp")
+        except OSError:
+            pass
     else:
         print("Temporary files kept.")
 
