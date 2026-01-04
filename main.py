@@ -1,7 +1,6 @@
 """
 Context-RCA 批量运行器 (调试增强版)
 """
-
 import os
 import json
 import asyncio
@@ -52,7 +51,7 @@ class CaseLogger:
         self.log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
         self.file_handler = None
-        self.logger = logging.getLogger("RootCauseAnalysis") # 绑定到业务 Logger
+        self.logger = logging.getLogger()
 
     def start(self, uuid: str, run_id: int = 1):
         """开始记录：添加 FileHandler
