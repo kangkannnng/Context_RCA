@@ -1,0 +1,37 @@
+2026-01-04 20:38:09,051 - root - INFO - === START SESSION: 0a4c5c18-349 (Run #1) ===
+2026-01-04 20:38:09,051 - RootCauseAnalysis - INFO - [Processing] 0a4c5c18-349 (Run #1) | Log: logs/0a4c5c18-349/run1_20260104_203809.log
+2026-01-04 20:38:09,052 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:09,052 - RootCauseAnalysis - INFO - ORCHESTRATOR AGENT - Initializing
+2026-01-04 20:38:09,052 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:09,052 - RootCauseAnalysis - INFO - [State Update] {"query_parsed_completed": false, "raw_metric_result": "（等待写入...）", "metric_data_collected": false, "raw_log_result": "（等待写入...）", "log_data_collected": false, "raw_trace_result": "（等待写入...）", "trace_data_collected": false, "current_iteration": 0, "current_hypothesis": "（等待写入...）", "log_analysis_findings": "（等待数据收集...）", "metric_analysis_findings": "（等待数据收集...）", "trace_analysis_findings": "（等待数据收集...）"}
+2026-01-04 20:38:09,054 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-4o; provider = openai
+2026-01-04 20:38:11,009 - RootCauseAnalysis - INFO - [Tool Call] parse_user_input
+2026-01-04 20:38:11,009 - RootCauseAnalysis - INFO -     Args: {'input_json': '{"Anomaly Description": "Determine the root cause of the system fault during 2025-06-18T06:10:15Z to 2025-06-18T06:15:15Z.", "uuid": "0a4c5c18-349"}'}...
+2026-01-04 20:38:11,010 - RootCauseAnalysis - INFO - [Tool Resp] parse_user_input
+2026-01-04 20:38:11,010 - RootCauseAnalysis - INFO -     Result: {'uuid': '0a4c5c18-349', 'user_query': 'Determine the root cause of the system fault during 2025-06-18T06:10:15Z to 2025-06-18T06:15:15Z.'}
+2026-01-04 20:38:11,010 - RootCauseAnalysis - INFO - [State Update] {"query_parsed_completed": true}
+2026-01-04 20:38:11,012 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-4o; provider = openai
+2026-01-04 20:38:12,698 - RootCauseAnalysis - INFO - [Tool Call] data_collection_agent
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO -     Args: {'request': '0a4c5c18-349'}...
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - METRIC ANALYSIS - Starting
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - METRIC AGENT - Initial Scanning
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - LOG ANALYSIS - Starting
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - LOG AGENT - Initial Scanning
+2026-01-04 20:38:12,699 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:12,700 - RootCauseAnalysis - INFO - TRACE ANALYSIS - Starting
+2026-01-04 20:38:12,700 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:38:12,700 - RootCauseAnalysis - INFO - TRACE AGENT - Initial Scanning
+2026-01-04 20:38:12,703 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-4o; provider = openai
+2026-01-04 20:38:12,704 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-4o; provider = openai
+2026-01-04 20:38:12,704 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-4o; provider = openai
+2026-01-04 20:38:14,791 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-4o; provider = openai

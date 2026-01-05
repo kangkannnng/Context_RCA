@@ -1,5 +1,5 @@
 """
-Context-RCA 批量运行器 (调试增强版)
+Context-RCA
 """
 import os
 import json

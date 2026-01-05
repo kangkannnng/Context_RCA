@@ -46,12 +46,20 @@ def normalize_instance(instance):
         return {i.strip() for i in instance}
     return set()
 
-def run_distributed_logic(input_file, output_file, workers, log_dir):
+def run_distributed_logic(input_file, output_file, workers, log_dir, random_sample=0, seed=42):
     """Core distributed runner logic"""
     # Generate a unique session ID
     session_id = uuid.uuid4().hex[:8]
     tmp_dir = os.path.join("tmp", session_id)
-    os.makedirs(tmp_dir, exist_ok=True)
+    
+    # Create subdirectories for better organization
+    tmp_input_dir = os.path.join(tmp_dir, "input")
+    tmp_output_dir = os.path.join(tmp_dir, "output")
+    tmp_log_dir = os.path.join(tmp_dir, "log")
+    
+    os.makedirs(tmp_input_dir, exist_ok=True)
+    os.makedirs(tmp_output_dir, exist_ok=True)
+    os.makedirs(tmp_log_dir, exist_ok=True)
     
     if not os.path.exists(input_file):
         print(f"Error: Input file {input_file} not found.")
@@ -60,6 +68,13 @@ def run_distributed_logic(input_file, output_file, workers, log_dir):
     with open(input_file, 'r') as f:
         data = json.load(f)
     
+    # Global Random Sampling
+    if random_sample > 0 and random_sample < len(data):
+        import random
+        random.seed(seed)
+        print(f"Randomly sampling {random_sample} items from {len(data)} total items (Seed: {seed}).")
+        data = random.sample(data, random_sample)
+
     total_items = len(data)
     if total_items == 0:
         print("Input file is empty.")
@@ -88,9 +103,9 @@ def run_distributed_logic(input_file, output_file, workers, log_dir):
             
         chunk_data = data[start_idx:end_idx]
         
-        temp_input = os.path.join(tmp_dir, f"temp_input_{i}.json")
-        temp_output = os.path.join(tmp_dir, f"temp_output_{i}.jsonl")
-        worker_log = os.path.join(tmp_dir, f"worker_{i}.log")
+        temp_input = os.path.join(tmp_input_dir, f"temp_input_{i}.json")
+        temp_output = os.path.join(tmp_output_dir, f"temp_output_{i}.jsonl")
+        worker_log = os.path.join(tmp_log_dir, f"worker_{i}.log")
         
         temp_files.append({
             "input": temp_input,
@@ -200,13 +215,8 @@ def scan_for_errors(result_file, input_file, gt_map=None):
         # Check for TODO or empty
         if not comp or comp.upper() == "TODO" or comp == "":
             failed_cases.append(case)
-        elif not reason:
+        elif not reason or reason.strip().upper() == "TODO":
             failed_cases.append(case)
-        # Check against GT if provided (Oracle Mode)
-        elif gt_map and uuid in gt_map:
-            gt_inst = normalize_instance(gt_map[uuid].get('instance', ''))
-            if comp not in gt_inst:
-                failed_cases.append(case)
             
     return failed_cases
 
@@ -216,7 +226,7 @@ def scan_for_errors(result_file, input_file, gt_map=None):
 
 def cmd_run(args):
     """Smart Run: Run -> Scan -> Retry -> Finalize"""
-    print("Starting Smart Run...")
+    print("Starting Running...")
     
     # Load GT if provided
     gt_map = {}
@@ -250,9 +260,29 @@ def cmd_run(args):
     
     current_input = args.input
     
+    # Handle Random Sampling explicitly here so scan_for_errors knows the correct input scope
+    if args.random > 0:
+        import random
+        random.seed(args.seed)
+        with open(args.input, 'r') as f:
+            all_data = json.load(f)
+        
+        if args.random < len(all_data):
+            print(f"Randomly sampling {args.random} items from {len(all_data)} total items (Seed: {args.seed}).")
+            sampled_data = random.sample(all_data, args.random)
+            
+            # Create a temporary input file for the sampled data
+            sampled_input_file = f"input_sampled_{args.seed}_{args.random}.json"
+            with open(sampled_input_file, 'w') as f:
+                json.dump(sampled_data, f, indent=2, ensure_ascii=False)
+            
+            current_input = sampled_input_file
+            # We don't need to pass random to run_distributed_logic anymore since we filtered the input
+            args.random = 0 
+
     # 1. Initial Run
     print("\n>>> Phase 1: Initial Execution")
-    success = run_distributed_logic(current_input, temp_run_output, args.workers, log_dir)
+    success = run_distributed_logic(current_input, temp_run_output, args.workers, log_dir, 0, args.seed)
     if not success:
         print("Execution interrupted.")
         return
@@ -266,7 +296,8 @@ def cmd_run(args):
     # 2. Retry Loop
     for attempt in range(args.retries):
         # Pass gt_map to scan_for_errors to enable Oracle Retry
-        failed_cases = scan_for_errors(temp_run_output, args.input, gt_map if args.groundtruth else None)
+        # IMPORTANT: Use current_input (which might be the sampled one) instead of args.input
+        failed_cases = scan_for_errors(temp_run_output, current_input, gt_map if args.groundtruth else None)
         if not failed_cases:
             print("\n>>> No errors found! Perfect run.")
             break
@@ -279,7 +310,7 @@ def cmd_run(args):
         with open(retest_input, 'w') as f:
             json.dump(failed_cases, f, indent=2, ensure_ascii=False)
             
-        success = run_distributed_logic(retest_input, retest_output, args.workers, log_dir)
+        success = run_distributed_logic(retest_input, retest_output, args.workers, log_dir, 0, args.seed) # Retry always runs all failed cases
         
         # Merge updates into main temp output
         base_data = load_jsonl(temp_run_output)
@@ -305,7 +336,7 @@ def cmd_run(args):
     
     # Sort by input order if possible
     try:
-        with open(args.input, 'r') as f:
+        with open(current_input, 'r') as f:
             input_order = [x['uuid'] for x in json.load(f) if 'uuid' in x]
             ordered_items = []
             for uid in input_order:
@@ -332,6 +363,10 @@ def cmd_run(args):
             
     if os.path.exists(temp_run_output):
         os.remove(temp_run_output)
+        
+    # Cleanup sampled input file if it exists
+    if current_input != args.input and os.path.exists(current_input):
+        os.remove(current_input)
         
     print("Done.")
 
@@ -435,6 +470,8 @@ def main():
     p_run.add_argument("--output", required=True, help="Final Output JSONL file")
     p_run.add_argument("--workers", type=int, default=10, help="Parallel workers")
     p_run.add_argument("--retries", type=int, default=3, help="Max auto-retries")
+    p_run.add_argument("--random", type=int, default=0, help="Randomly sample N items to run (0 for all)")
+    p_run.add_argument("--seed", type=int, default=42, help="Random seed for sampling (default: 42)")
     p_run.add_argument("--log-dir", default="logs", help="Log directory (will be overwritten)")
     p_run.add_argument("--groundtruth", default="output/groundtruth.jsonl", help="GT file for Oracle Retry (default: output/groundtruth.jsonl)")
     p_run.set_defaults(func=cmd_run)

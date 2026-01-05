@@ -1,0 +1,95 @@
+2026-01-04 20:12:53,776 - root - INFO - === START SESSION: 5f904167-89 (Run #1) ===
+2026-01-04 20:12:53,776 - RootCauseAnalysis - INFO - [Processing] 5f904167-89 (Run #1) | Log: logs/5f904167-89/run1_20260104_201253.log
+2026-01-04 20:12:53,777 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:12:53,777 - RootCauseAnalysis - INFO - ORCHESTRATOR AGENT - Initializing
+2026-01-04 20:12:53,777 - RootCauseAnalysis - INFO - ============================================================
+2026-01-04 20:12:53,777 - RootCauseAnalysis - INFO - [State Update] {"query_parsed_completed": false, "raw_metric_result": "（等待写入...）", "metric_data_collected": false, "raw_log_result": "（等待写入...）", "log_data_collected": false, "raw_trace_result": "（等待写入...）", "trace_data_collected": false, "current_iteration": 0, "current_hypothesis": "（等待写入...）", "log_analysis_findings": "（等待数据收集...）", "metric_analysis_findings": "（等待数据收集...）", "trace_analysis_findings": "（等待数据收集...）"}
+2026-01-04 20:12:53,778 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-4o; provider = openai
+2026-01-04 20:12:53,846 - RootCauseAnalysis - ERROR - Error in runner: litellm.AuthenticationError: AuthenticationError: OpenAIException - [sk-2aB***iFM] 该令牌额度已用尽 !token.UnlimitedQuota && token.RemainQuota = -22716 (request id: 20260104121253679590668pUzt7a2y)
+2026-01-04 20:12:53,846 - RootCauseAnalysis - ERROR - Runner Exception: litellm.AuthenticationError: AuthenticationError: OpenAIException - [sk-2aB***iFM] 该令牌额度已用尽 !token.UnlimitedQuota && token.RemainQuota = -22716 (request id: 20260104121253679590668pUzt7a2y)
+Traceback (most recent call last):
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/llms/openai/openai.py", line 840, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/litellm_core_utils/logging_utils.py", line 190, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/llms/openai/openai.py", line 460, in make_openai_chat_completion_request
+    raise e
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/llms/openai/openai.py", line 437, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/openai/_legacy_response.py", line 381, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/openai/resources/chat/completions/completions.py", line 2678, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/openai/_base_client.py", line 1797, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/openai/_base_client.py", line 1597, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.AuthenticationError: Error code: 401 - {'error': {'code': '', 'message': '[sk-2aB***iFM] 该令牌额度已用尽 !token.UnlimitedQuota && token.RemainQuota = -22716 (request id: 20260104121253679590668pUzt7a2y)', 'type': 'new_api_error'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/main.py", line 609, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/llms/openai/openai.py", line 887, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 401 - {'error': {'code': '', 'message': '[sk-2aB***iFM] 该令牌额度已用尽 !token.UnlimitedQuota && token.RemainQuota = -22716 (request id: 20260104121253679590668pUzt7a2y)', 'type': 'new_api_error'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/kk/code/context_rca/main.py", line 136, in run_one
+    async for event in self.runner.run_async(
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/runners.py", line 505, in run_async
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/runners.py", line 493, in _run_with_trace
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/runners.py", line 722, in _exec_with_plugin
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/runners.py", line 482, in execute
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/agents/base_agent.py", line 294, in run_async
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/agents/llm_agent.py", line 460, in _run_async_impl
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/flows/llm_flows/base_llm_flow.py", line 370, in run_async
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/flows/llm_flows/base_llm_flow.py", line 447, in _run_one_step_async
+    async for llm_response in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/flows/llm_flows/base_llm_flow.py", line 816, in _call_llm_async
+    async for event in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/flows/llm_flows/base_llm_flow.py", line 800, in _call_llm_with_tracing
+    async for llm_response in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/flows/llm_flows/base_llm_flow.py", line 1053, in _run_and_handle_error
+    raise model_error
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/flows/llm_flows/base_llm_flow.py", line 1039, in _run_and_handle_error
+    async for response in agen:
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/models/lite_llm.py", line 1586, in generate_content_async
+    response = await self.llm_client.acompletion(**completion_args)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/google/adk/models/lite_llm.py", line 244, in acompletion
+    return await acompletion(
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/utils.py", line 1666, in wrapper_async
+    raise e
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/utils.py", line 1512, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/main.py", line 628, in acompletion
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2340, in exception_type
+    raise e
+  File "/home/kk/code/context_rca/.venv/lib/python3.12/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 494, in exception_type
+    raise AuthenticationError(
+litellm.exceptions.AuthenticationError: litellm.AuthenticationError: AuthenticationError: OpenAIException - [sk-2aB***iFM] 该令牌额度已用尽 !token.UnlimitedQuota && token.RemainQuota = -22716 (request id: 20260104121253679590668pUzt7a2y)
+2026-01-04 20:12:53,847 - RootCauseAnalysis - INFO - [Final State Summary]
+2026-01-04 20:12:53,848 - RootCauseAnalysis - INFO -    - current_hypothesis: （等待写入...）
+2026-01-04 20:12:53,848 - root - INFO - === END SESSION ===

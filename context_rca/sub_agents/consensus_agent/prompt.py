@@ -109,15 +109,14 @@ User → Frontend (入口网关)
 示例: shippingservice-0 进程数变化，CartService 延迟 18s
 - ❌ 错误: 根因是 CartService (被延迟误导)
 - ✅ 正确: 根因是 shippingservice-0 (Pod 重启是根源)
-**关键词**: `io_util`, `region_pending`, `raft_apply_wait`
 
-### 模式6: Pod 级故障 (粒度仲裁) ⭐关键
+### 模式7: Pod 级故障 (粒度仲裁) ⭐关键
 **特征**: Metric 专家报告显示**仅特定 Pod** (如 `shippingservice-0`) 指标异常，而同服务的其他 Pod 正常。
 **根因**: **必须**锁定为该特定 Pod (如 `shippingservice-0`)。
 **严禁**: 此时严禁归因为整个 Service (`shippingservice`)，否则视为误判。
 **关键词**: `pod_cpu_usage`, `pod_memory_working_set_bytes` (注意观察是否带编号)
 
-### 模式7: 杀信使 (Don't Shoot the Messenger)
+### 模式8: 上下游服务判断
 **特征**: 上游服务 (如 Frontend) 报 `DeadlineExceeded` 或 `Unavailable`，但 Trace 显示是下游服务 (如 AdService) 响应慢。
 **根因**: 下游服务 (AdService)。
 **原则**: 报错的服务往往是受害者，变慢的服务才是凶手。
