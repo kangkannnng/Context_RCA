@@ -5,7 +5,7 @@ from context_rca.sub_agents.metric_agent.tools import metric_analysis_tool
 from context_rca.sub_agents.metric_agent.prompt import METRIC_AGENT_PROMPT
 from context_rca.callbacks.metric_agent_callbacks import before_metric_analysis, after_metric_analysis
 
-model = LiteLlm(model='openai/deepseek-chat')
+model = LiteLlm(model='gpt-4o')
 
 metric_agent = Agent(
     name="metric_agent",

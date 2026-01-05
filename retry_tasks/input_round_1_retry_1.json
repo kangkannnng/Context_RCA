@@ -1,0 +1,18 @@
+[
+  {
+    "Anomaly Description": "A fault was detected from 2025-06-06T18:10:05Z to 2025-06-06T18:21:05Z. Please analyze its root cause.",
+    "uuid": "3df3b41f-105"
+  },
+  {
+    "Anomaly Description": "Determine the root cause of the system fault during 2025-06-08T17:10:04Z to 2025-06-08T17:10:05Z.",
+    "uuid": "162fe36a-151"
+  },
+  {
+    "Anomaly Description": "A fault occurred from 2025-06-09T20:10:20Z to 2025-06-09T20:35:20Z. Please identify the root cause.",
+    "uuid": "6892c835-177"
+  },
+  {
+    "Anomaly Description": "A fault was detected from 2025-06-10T23:10:19Z to 2025-06-10T23:23:19Z. Please analyze its root cause.",
+    "uuid": "eb79e778-204"
+  }
+]

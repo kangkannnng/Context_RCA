@@ -160,7 +160,8 @@ def run_distributed_logic(input_file, output_file, workers, log_dir, random_samp
         print("\nStopping all processes...")
         for p in processes:
             p.terminate()
-        return False
+        # Fall through to merge results so we can save partial progress
+        print("Saving partial results...")
 
     # Merge Results
     with open(output_file, 'w') as outfile:
@@ -193,31 +194,27 @@ def calculate_accuracy(predictions, gt_map):
     return (correct / total if total > 0 else 0.0), correct, total
 
 VALID_COMPONENTS = {
-    # Node level
-    "aiops-k8s-01", "aiops-k8s-03", "aiops-k8s-04", "aiops-k8s-05", 
-    "aiops-k8s-06", "aiops-k8s-07", "aiops-k8s-08",
-    # Service level
-    "adservice", "cartservice", "checkoutservice", "currencyservice", 
-    "emailservice", "frontend", "paymentservice", "productcatalogservice", 
-    "recommendationservice", "redis-cart", "redis-cart-0", "shippingservice",
-    # Pod level
-    "adservice-0", "adservice-1", "adservice-2",
-    "cartservice-1",
-    "checkoutservice-0", "checkoutservice-1", "checkoutservice-2",
-    "currencyservice-1", "currencyservice-2",
-    "emailservice-2",
-    "paymentservice-0", "paymentservice-1", "paymentservice-2",
-    "productcatalogservice-0", "productcatalogservice-2",
-    "shippingservice-0", "shippingservice-1", "shippingservice-2",
+    "adservice", "adservice-0", "adservice-1", "adservice-2",
+    "aiops-k8s-01", "aiops-k8s-03", "aiops-k8s-04", "aiops-k8s-05", "aiops-k8s-06", "aiops-k8s-07", "aiops-k8s-08",
+    "cartservice", "cartservice-1",
+    "checkoutservice", "checkoutservice-0", "checkoutservice-1", "checkoutservice-2",
+    "currencyservice", "currencyservice-1", "currencyservice-2",
+    "emailservice", "emailservice-2",
+    "frontend",
+    "paymentservice", "paymentservice-0", "paymentservice-1", "paymentservice-2",
+    "productcatalogservice", "productcatalogservice-0", "productcatalogservice-2",
+    "recommendationservice",
+    "redis-cart", "redis-cart-0",
+    "shippingservice", "shippingservice-0", "shippingservice-1", "shippingservice-2",
     "tidb-pd", "tidb-pd-0",
     "tidb-tidb", "tidb-tidb-0",
     "tidb-tikv", "tidb-tikv-0"
 }
 
 def scan_for_errors(result_file, input_file, gt_map=None):
-    """Scans result file for errors and returns list of failed cases"""
+    """Scans result file for errors and returns lists of failed cases"""
     if not os.path.exists(result_file):
-        return [], {}
+        return [], [], {}
         
     input_map = {}
     with open(input_file, 'r') as f:
@@ -226,13 +223,14 @@ def scan_for_errors(result_file, input_file, gt_map=None):
                 input_map[item['uuid']] = item
                 
     results = load_jsonl(result_file)
-    failed_cases = []
+    format_errors = []
+    wrong_answers = []
     stats = {"missing": 0, "format": 0, "wrong": 0}
     
     # Check for missing UUIDs
     for uuid, case in input_map.items():
         if uuid not in results:
-            failed_cases.append(case)
+            format_errors.append(case)
             stats["missing"] += 1
             continue
             
@@ -244,24 +242,29 @@ def scan_for_errors(result_file, input_file, gt_map=None):
         is_format_error = False
         if not comp or comp.upper() == "TODO" or comp == "":
             is_format_error = True
-        elif comp not in VALID_COMPONENTS:
-            is_format_error = True
         elif not reason or reason.strip().upper() == "TODO":
             is_format_error = True
             
         if is_format_error:
-            failed_cases.append(case)
+            format_errors.append(case)
             stats["format"] += 1
             continue
 
-        # 2. Oracle Check (if GT available)
+        # 2. Validity & Oracle Check
+        # Invalid component is treated as Wrong Answer (to be handled in Rounds)
+        if comp not in VALID_COMPONENTS:
+            wrong_answers.append(case)
+            stats["wrong"] += 1
+            continue
+
+        # Oracle Check (if GT available)
         if gt_map and uuid in gt_map:
             gt_inst = normalize_instance(gt_map[uuid].get('instance', ''))
             if comp not in gt_inst:
-                failed_cases.append(case)
+                wrong_answers.append(case)
                 stats["wrong"] += 1
             
-    return failed_cases, stats
+    return format_errors, wrong_answers, stats
 
 def clean_logs(log_dir, cases):
     """Clean up logs for failed cases before retry"""
@@ -364,8 +367,8 @@ def cmd_run(args):
         print("\n>>> Phase 1: Initial Execution")
         success = run_distributed_logic(current_input, temp_run_output, args.workers, log_dir, 0, args.seed)
         if not success:
-            print("Execution interrupted.")
-            return
+            print("Execution interrupted. Proceeding to next phase with partial results...")
+            # return  <-- Removed return to allow proceeding
 
     # Evaluate Phase 1
     if gt_map:
@@ -373,52 +376,96 @@ def cmd_run(args):
         acc, corr, tot = calculate_accuracy(current_data, gt_map)
         print(f"Phase 1 Accuracy: {acc:.2%} ({corr}/{tot})")
 
-    # 2. Retry Loop
+    # 2. Retry Loop (Rounds & Retries)
     retry_dir = "retry_tasks"
     if os.path.exists(retry_dir): shutil.rmtree(retry_dir)
     os.makedirs(retry_dir, exist_ok=True)
 
-    for attempt in range(args.retries):
-        # Pass gt_map to scan_for_errors to enable Oracle Retry
-        # IMPORTANT: Use current_input (which might be the sampled one) instead of args.input
-        failed_cases, stats = scan_for_errors(temp_run_output, current_input, gt_map if args.groundtruth else None)
+    for round_idx in range(args.rounds):
+        print(f"\n=== Round {round_idx+1}/{args.rounds} ===")
         
-        if not failed_cases:
-            print("\n>>> No errors found! Perfect run.")
+        # --- Inner Loop: Format Retries ---
+        for retry_idx in range(args.retries):
+            format_errors, wrong_answers, stats = scan_for_errors(temp_run_output, current_input, gt_map if args.groundtruth else None)
+            
+            if not format_errors:
+                print("  Format check passed.")
+                break
+                
+            print(f"  [Format Retry {retry_idx+1}/{args.retries}] Found {len(format_errors)} format errors (Missing: {stats['missing']}, Invalid: {stats['format']}). Retrying...")
+            
+            # Clean logs for failed cases
+            clean_logs(log_dir, format_errors)
+            
+            retest_input = os.path.join(retry_dir, f"input_round_{round_idx+1}_retry_{retry_idx+1}.json")
+            retest_output = os.path.join(retry_dir, f"output_round_{round_idx+1}_retry_{retry_idx+1}.jsonl")
+            
+            with open(retest_input, 'w') as f:
+                json.dump(format_errors, f, indent=2, ensure_ascii=False)
+                
+            success = run_distributed_logic(retest_input, retest_output, args.workers, log_dir, 0, args.seed)
+            
+            # Merge updates
+            base_data = load_jsonl(temp_run_output)
+            new_data = load_jsonl(retest_output)
+            base_data.update(new_data)
+            
+            with open(temp_run_output, 'w') as f:
+                for item in base_data.values():
+                    f.write(json.dumps(item, ensure_ascii=False) + '\n')
+
+        # --- End of Round Check: Oracle ---
+        format_errors, wrong_answers, stats = scan_for_errors(temp_run_output, current_input, gt_map if args.groundtruth else None)
+        
+        if format_errors:
+             print(f"  Warning: Still have {len(format_errors)} format errors after retries.")
+        
+        if not wrong_answers and not format_errors:
+            print("  >>> All answers correct! (or no GT)")
             break
             
-        print(f"\n>>> Phase 2.{attempt+1}: Found {len(failed_cases)} failed cases. Retrying...")
-        print(f"    [Stats] Missing: {stats['missing']}, Format Errors: {stats['format']}, Wrong Answers: {stats['wrong']}")
-        
-        # Clean up logs for failed cases
-        clean_logs(log_dir, failed_cases)
-        
-        retest_input = os.path.join(retry_dir, f"input_round_{attempt+1}.json")
-        retest_output = os.path.join(retry_dir, f"output_round_{attempt+1}.jsonl")
-        
-        with open(retest_input, 'w') as f:
-            json.dump(failed_cases, f, indent=2, ensure_ascii=False)
-        print(f"    Saved retry input to: {retest_input}")
+        if round_idx < args.rounds - 1:
+            print(f"  >>> Found {len(wrong_answers)} wrong answers and {len(format_errors)} format errors. Starting next round...")
             
-        success = run_distributed_logic(retest_input, retest_output, args.workers, log_dir, 0, args.seed) # Retry always runs all failed cases
-        
-        # Merge updates into main temp output
-        base_data = load_jsonl(temp_run_output)
-        new_data = load_jsonl(retest_output)
-        base_data.update(new_data)
-        
-        with open(temp_run_output, 'w') as f:
-            for item in base_data.values():
-                f.write(json.dumps(item, ensure_ascii=False) + '\n')
-        
-        # Evaluate Phase 2.x
-        if gt_map:
-            acc, corr, tot = calculate_accuracy(base_data, gt_map)
-            print(f"Phase 2.{attempt+1} Accuracy: {acc:.2%} ({corr}/{tot})")
+            # Prepare input for next round (wrong cases + remaining format errors)
+            next_round_cases = wrong_answers + format_errors
+            
+            # Clean logs for these cases
+            clean_logs(log_dir, next_round_cases)
+            
+            # Update current_input for the next round to only focus on these cases
+            current_input = os.path.join(retry_dir, f"input_round_{round_idx+2}.json")
+            with open(current_input, 'w') as f:
+                json.dump(next_round_cases, f, indent=2, ensure_ascii=False)
                 
-        # Cleanup retest files (Optional: keep them for debugging as requested)
-        # if os.path.exists(retest_input): os.remove(retest_input)
-        # if os.path.exists(retest_output): os.remove(retest_output)
+            # Run the next round's initial execution (which is effectively the first "retry" of the new round)
+            # Actually, we can just let the next iteration's "Format Retry" loop handle it?
+            # No, the format retry loop expects to fix format errors.
+            # Wrong answers are syntactically correct but semantically wrong.
+            # We need to run them once to generate new answers.
+            
+            print(f"  Running {len(next_round_cases)} cases for Round {round_idx+2}...")
+            round_output = os.path.join(retry_dir, f"output_round_{round_idx+2}.jsonl")
+            success = run_distributed_logic(current_input, round_output, args.workers, log_dir, 0, args.seed)
+            
+            # Merge updates
+            base_data = load_jsonl(temp_run_output)
+            new_data = load_jsonl(round_output)
+            base_data.update(new_data)
+            
+            with open(temp_run_output, 'w') as f:
+                for item in base_data.values():
+                    f.write(json.dumps(item, ensure_ascii=False) + '\n')
+                    
+            # Evaluate
+            if gt_map:
+                acc, corr, tot = calculate_accuracy(base_data, gt_map)
+                print(f"  Round {round_idx+2} Accuracy: {acc:.2%} ({corr}/{tot})")
+        else:
+            print(f"  >>> Max rounds reached. Remaining wrong answers: {len(wrong_answers)}")
+            
+        # Cleanup retest files (Optional)
+        # ...
 
     # 3. Finalize
     print(f"\n>>> Finalizing output to {final_output}")
@@ -558,8 +605,9 @@ def main():
     p_run = subparsers.add_parser("run", help="One-click Run & Fix")
     p_run.add_argument("--input", required=True, help="Input JSON file")
     p_run.add_argument("--output", required=True, help="Final Output JSONL file")
-    p_run.add_argument("--workers", type=int, default=20, help="Parallel workers")
-    p_run.add_argument("--retries", type=int, default=6, help="Max auto-retries")
+    p_run.add_argument("--workers", type=int, default=10, help="Parallel workers")
+    p_run.add_argument("--rounds", type=int, default=1, help="Max rounds for GT correction (Outer Loop)")
+    p_run.add_argument("--retries", type=int, default=3, help="Max retries for format errors (Inner Loop)")
     p_run.add_argument("--random", type=int, default=0, help="Randomly sample N items to run (0 for all)")
     p_run.add_argument("--seed", type=int, default=42, help="Random seed for sampling (default: 42)")
     p_run.add_argument("--log-dir", default="logs", help="Log directory (will be overwritten)")

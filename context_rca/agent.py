@@ -31,7 +31,7 @@ consensus_discussion_tool = LoopAgent(
     max_iterations=6,
 )
 
-model = LiteLlm(model='openai/deepseek-chat')
+model = LiteLlm(model='gpt-4o')
 
 orchestrator_agent = Agent(
     name="orchestrator_agent",

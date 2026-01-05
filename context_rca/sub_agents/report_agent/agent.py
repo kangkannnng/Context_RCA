@@ -5,7 +5,7 @@ from context_rca.sub_agents.report_agent.prompt import REPORT_AGENT_PROMPT
 from context_rca.schemas.report_schema import AnalysisReport
 from context_rca.callbacks.report_agent_callbacks import before_report_analysis, after_report_analysis
 
-model = LiteLlm(model='openai/deepseek-chat')
+model = LiteLlm(model='gpt-4o')
 
 report_agent = Agent(
     name="report_agent",
