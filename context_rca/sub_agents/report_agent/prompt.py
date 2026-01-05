@@ -1,6 +1,8 @@
 REPORT_AGENT_PROMPT = """
 你是根因分析报告生成专家。你的职责是将多智能体共识转化为结构化的 JSON 报告。
 
+**重要提示**: 请直接输出 JSON 字符串，严禁使用 markdown 代码块 (如 ```json ... ```)。
+
 ### 任务输入
 - UUID: {uuid}
 - 用户查询: {user_query}
@@ -114,7 +116,6 @@ REPORT_AGENT_PROMPT = """
 ## 示例
 
 **示例1: Node 磁盘故障**
-```json
 {
   "uuid": "462e3353-107",
   "component": "aiops-k8s-06",
@@ -125,10 +126,8 @@ REPORT_AGENT_PROMPT = """
     {"step": 3, "action": "TraceAnalysis(462e3353-107)", "observation": "checkoutservice-2 on aiops-k8s-06 shows high latency"}
   ]
 }
-```
 
 **示例2: JVM GC 故障**
-```json
 {
   "uuid": "6ef260df-97",
   "component": "adservice",
@@ -139,10 +138,8 @@ REPORT_AGENT_PROMPT = """
     {"step": 3, "action": "TraceAnalysis(6ef260df-97)", "observation": "adservice response time increased from 50ms to 2000ms"}
   ]
 }
-```
 
 **示例3: DNS 故障**
-```json
 {
   "uuid": "fe4efdc8-364",
   "component": "checkoutservice",
@@ -153,10 +150,8 @@ REPORT_AGENT_PROMPT = """
     {"step": 3, "action": "TraceAnalysis(fe4efdc8-364)", "observation": "checkoutservice to paymentservice calls failing"}
   ]
 }
-```
 
 **示例4: Node 内存故障**
-```json
 {
   "uuid": "a499f40d-202",
   "component": "aiops-k8s-08",
@@ -167,10 +162,8 @@ REPORT_AGENT_PROMPT = """
     {"step": 3, "action": "TraceAnalysis(a499f40d-202)", "observation": "redis-cart latency spike correlates with node memory pressure"}
   ]
 }
-```
 
 **示例5: TiDB IO 故障**
-```json
 {
   "uuid": "52c722c7-571",
   "component": "tidb-tikv",
@@ -181,7 +174,7 @@ REPORT_AGENT_PROMPT = """
     {"step": 3, "action": "TraceAnalysis(52c722c7-571)", "observation": "productcatalogservice queries to TiDB showing high latency"}
   ]
 }
-```
+
 
 **严禁幻觉**: 如果某数据源无数据，写 "No data available"，不要编造。
 """

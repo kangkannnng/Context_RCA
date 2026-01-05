@@ -4,7 +4,7 @@ from google.adk.models.lite_llm import LiteLlm
 from context_rca.sub_agents.consensus_agent.prompt import CONSENSUS_AGENT_PROMPT
 from context_rca.callbacks.consensus_agent_callbacks import before_consensus_analysis, after_consensus_analysis
 
-model = LiteLlm(model='gpt-4o')
+model = LiteLlm(model='openai/deepseek-chat')
 
 consensus_agent = Agent(
     name="consensus_agent",

@@ -5,7 +5,7 @@ from context_rca.sub_agents.trace_agent.tools import trace_analysis_tool
 from context_rca.sub_agents.trace_agent.prompt import TRACE_AGENT_PROMPT
 from context_rca.callbacks.trace_agent_callbacks import before_trace_analysis, after_trace_analysis
 
-model = LiteLlm(model='gpt-4o')
+model = LiteLlm(model='openai/deepseek-chat')
 
 trace_agent = Agent(
     name="trace_agent",

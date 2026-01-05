@@ -5,7 +5,7 @@ from context_rca.sub_agents.log_agent.tools import log_analysis_tool
 from context_rca.sub_agents.log_agent.prompt import LOG_AGENT_PROMPT
 from context_rca.callbacks.log_agent_callbacks import before_log_analysis, after_log_analysis
 
-model = LiteLlm(model='gpt-4o')
+model = LiteLlm(model='openai/deepseek-chat')
 
 log_agent = Agent(
     name="log_agent",

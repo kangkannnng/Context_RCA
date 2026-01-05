@@ -64,12 +64,17 @@ class CaseLogger:
         case_dir = os.path.join(self.log_dir, uuid)
         os.makedirs(case_dir, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(case_dir, f"run{run_id}_{timestamp}.log")
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # log_file = os.path.join(case_dir, f"run{run_id}_{timestamp}.log")
+        
+        # 使用固定文件名，覆盖旧日志
+        log_file = os.path.join(case_dir, "run.log")
 
-        self.file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        self.file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
         self.file_handler.setLevel(logging.INFO) # 文件记录详细信息
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        # 去除时间戳，只保留 Logger Name, Level 和 Message
+        formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
         self.file_handler.setFormatter(formatter)
 
         self.logger.addHandler(self.file_handler)
