@@ -2,48 +2,74 @@
 
 Context-RCA 是一个基于大语言模型（LLM）和多智能体协作（Multi-Agent Collaboration）架构的微服务故障根因分析系统。它模拟了一支由资深 SRE 专家组成的“虚拟作战室”，通过严谨的 SOP（标准作业程序）和多轮辩论机制，自动化完成从现象发现、证据搜集到根因定性的全过程。
 
-## 🌟 核心设计亮点 (Design Philosophy)
+## 系统架构与方法论 (System Architecture & Methodology)
 
-### 1. 专家委员会机制 (Committee of Experts)
-不同于单一 Agent 的“全能模式”，我们设计了专职专责的专家角色：
-- **Metric Agent (指标专家)**: 专注于时序数据分析，擅长识别 `latency_spike` (延迟突增) 和 `error_ratio` (错误率) 异常，并能区分 Pod 重启 (`pod_processes`) 导致的次生灾害。
-- **Log Agent (日志专家)**: 深入日志堆栈，精准定位 `Error`、`Exception` 及关键的业务报错信息。
-- **Trace Agent (链路专家)**: 追踪分布式调用链，识别关键路径上的瓶颈服务。
-- **Consensus Agent (决策主席)**: 扮演“法官”角色，不直接处理原始数据，而是综合各方专家的“证词”，通过交叉验证（Cross-Validation）排除幻觉，形成最终判决。
+我们提出了一种四层架构，旨在将执行关注点与认知推理分离，模拟人类作战室的协作模式。
 
-### 2. 证据驱动的推理 (Evidence-Based Reasoning)
-系统拒绝“猜测”。所有的结论必须建立在确凿的证据链之上：
-- **多模态对齐**: 只有当 Metric 显示异常且 Log/Trace 提供佐证时，才会被认定为根因。
-- **因果链构建**: 能够识别“因”与“果”，例如：准确识别出 *CartService 的高延迟* 实际上是由 *ShippingService 的 Pod 重启* 引起的，从而避免误报。
+### 1. 架构分层 (Layered Architecture)
 
-### 3. 鲁棒的分布式执行架构 (Robust Distributed Execution)
-为了应对大规模数据集的评测需求，我们设计了基于进程隔离的分布式运行器：
-- **进程级隔离**: 每个 Case 独立运行，互不干扰，彻底解决 LLM API 并发导致的线程安全问题。
-- **断点续传**: 支持失败重试和增量运行。
-- **实时监控**: 内置进度条与 ETA 预估，实时掌握大规模评测进度。
+*   **Orchestration Layer (编排层)**:
+    *   **Orchestrator Agent**: 作为中央状态机，强制执行标准作业程序 (SOP)。它负责解析用户查询 (`parse_user_input`) 并管理分析会话的全生命周期，确保数据流在各阶段间的正确流转。
+*   **Expert Layer (专家层)**:
+    *   **Metric Agent**: 专注于时序数据分析，识别延迟突增、错误率异常，并区分 Pod 级与 Node 级资源争用。
+    *   **Log Agent**: 分析结构化与非结构化日志，定位异常堆栈与关键错误模式（如 DNS 失败）。
+    *   **Trace Agent**: 基于分布式追踪数据构建服务依赖图，定位瓶颈服务与故障传播路径。
+*   **Reasoning Layer (推理层)**:
+    *   **Consensus Agent & Iterative Loop**: 系统的核心引擎。它不直接处理原始数据，而是作为“法官”评估专家层的证词。通过**挑战-应答 (Challenge-Response)** 机制和多轮迭代（最多 6 轮），解决跨模态的证据冲突（例如指标与日志的归因不一致）。
+*   **Reporting Layer (报告层)**:
+    *   **Report Agent**: 将最终达成的共识综合为结构化的诊断报告，包含根因、证据链及影响范围。
 
-## 🏗️ 系统架构
+### 2. 诊断工作流 (Diagnosis Workflow)
+
+分析过程遵循严格的 **三阶段 SOP (Three-Phase SOP)**：
+
+*   **Phase I: 多视角证据挖掘 (Multi-View Evidence Mining)**
+    Orchestrator 调度 **Data Collection Agent** 并行启动三位领域专家 (Metric, Log, Trace)。各专家独立从各自的数据源中提取“局部证据”和异常发现。
+*   **Phase II: 协作推理与共识 (Collaborative Reasoning)**
+    **Consensus Discussion Agent** 启动辩论循环：
+    1.  **假设生成**: 基于聚合的发现提出初始假设 $H_0$。
+    2.  **交叉验证**: 检查证据对齐情况（例如：网络故障假设需要 Metric 的丢包数据与 Log 的连接超时同时存在）。
+    3.  **冲突解决**: 当专家意见不一致时（如 Node 故障 vs Pod 故障），触发特定的**模式匹配 (Pattern Matching)** 逻辑进行裁决。
+    4.  循环直至达成 `AGREED` 状态或达到最大轮次。
+*   **Phase III: 最终裁决报告 (Verdict & Reporting)**
+    Orchestrator 将最终共识上下文传递给 Report Agent，生成人类可读的最终报告。
 
 ```mermaid
 graph TD
-    User[用户输入] --> Runner[Distributed Runner]
-    Runner -->|Spawn Process| Orch[Orchestrator]
+    User((User Input)) --> Orch[Orchestrator Agent]
     
-    subgraph "Virtual War Room"
-        Orch -->|SOP Phase 1| DC[Data Collection]
-        DC --> Metric[Metric Agent]
-        DC --> Log[Log Agent]
-        DC --> Trace[Trace Agent]
-        
-        Metric & Log & Trace -->|Evidence| Consensus[Consensus Agent]
-        Consensus -->|Challenge| Metric
-        Consensus -->|Challenge| Log
-        
-        Consensus -->|Final Verdict| Report[Report Agent]
+    subgraph "Phase I: Evidence Mining"
+        Orch -->|Dispatch| DC[Data Collection Manager]
+        DC -->|Parallel| M[Metric Agent]
+        DC -->|Parallel| L[Log Agent]
+        DC -->|Parallel| T[Trace Agent]
     end
     
-    Report --> Result[JSON Report]
+    subgraph "Phase II: Collaborative Reasoning"
+        M & L & T -->|Findings| Context[Shared Context]
+        Context --> Consensus[Consensus Agent]
+        
+        Consensus -->|Challenge/Query| DC
+        DC -->|Refined Evidence| Context
+        
+        note[Loop until Verdict] -.-> Consensus
+    end
+    
+    subgraph "Phase III: Reporting"
+        Consensus -->|Final Verdict| Report[Report Agent]
+        Report --> Result[JSON Report]
+    end
+    
+    classDef agent fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    class Orch,M,L,T,Consensus,Report agent
 ```
+
+### 3. 方法论亮点 (Key Methodology)
+
+*   **专家知识注入 (Expert Knowledge Injection)**
+    系统不完全依赖 LLM 的概率推理，而是在 Consensus Agent 中注入了显式的 **故障模式 (Fault Patterns)**（如 DNS 故障特征、Node vs Pod 资源归因逻辑），显著减少了幻觉。
+*   **证据驱动裁决 (Evidence-Driven Adjudication)**
+    **多模态对齐 (Multi-modal Alignment)**：任何因果结论都必须在至少两个模态（如 Metric + Log）中得到相互印证才会被最终采纳。
 
 ## 🚀 快速开始
 
@@ -109,5 +135,3 @@ python main.py --single 1
 }
 ```
 
----
-*Designed for SREs, by AI Agents.*
