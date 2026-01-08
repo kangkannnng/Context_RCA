@@ -56,6 +56,10 @@ def before_log_analysis_no_select(callback_context: CallbackContext) -> Optional
     logger.info("=" * 60)
 
     state = callback_context.state
+
+    # Ensure flag exists for prompt to avoid KeyError
+    state.setdefault("log_data_collected", False)
+
     full_context = _format_full_context(state)
 
     state["current_task_instruction"] = (
@@ -76,6 +80,10 @@ def before_metric_analysis_no_select(callback_context: CallbackContext) -> Optio
     logger.info("=" * 60)
     
     state = callback_context.state
+
+    # Ensure flag exists for prompt to avoid KeyError
+    state.setdefault("metric_data_collected", False)
+
     full_context = _format_full_context(state)
 
     state["current_task_instruction"] = (
@@ -96,6 +104,10 @@ def before_trace_analysis_no_select(callback_context: CallbackContext) -> Option
     logger.info("=" * 60)
 
     state = callback_context.state
+
+    # Ensure flag exists for prompt to avoid KeyError
+    state.setdefault("trace_data_collected", False)
+
     full_context = _format_full_context(state)
 
     state["current_task_instruction"] = (
@@ -113,9 +125,13 @@ def before_consensus_analysis_no_select(callback_context: CallbackContext) -> Op
     """共识分析前的回调函数 (w/o Selective Context)"""
     state = callback_context.state
     
+    # Ensure flag exists for prompt to avoid KeyError
+    state.setdefault("current_hypothesis", "None")
+
     # Increase iteration counter similar to original
     iteration = state.get("consensus_iteration", 0)
     state["consensus_iteration"] = iteration + 1
+    state["current_iteration"] = iteration + 1
     
     logger.info("=" * 60)
     logger.info(f"CONSENSUS ANALYSIS (No Selective Context) - Round {iteration}")
@@ -154,6 +170,10 @@ def before_report_analysis_no_select(callback_context: CallbackContext) -> Optio
     
     # Similar strategy: Overload the variables used in REPORT_AGENT_PROMPT
     # The prompt uses {hypotheses_summary}, {trace_...}, {metric_...}, {log_...}
+    
+    # Ensure flags exist for prompt to avoid KeyError
+    state.setdefault("hypotheses_summary", "None")
+    state.setdefault("node_pod_mapping", "Unknown mapping")
     
     state["hypotheses_summary"] = f"[FULL CONTEXT INJECTION]\n{full_context}"
     state["log_analysis_findings"] = "See Hypotheses Summary for Full Context"
