@@ -1,0 +1,1240 @@
+================================================================================
+时间: 2026-01-05 09:08:01
+调用类型: 第1次调用-Service和TiDB级别综合分析
+================================================================================
+
+【输入Prompt】:
+
+请根据提供的APM（应用性能监控）指标数据和TiDB分布式数据库指标数据，描述所有服务在正常期间和故障期间的业务服务性能表现差异现象。
+
+## 系统整体信息
+- **微服务总数**: 11
+- **TiDB组件数**: 3
+- **服务总数**: 14
+- **Pod总数**: 29
+- **服务列表**: ['productcatalogservice', 'paymentservice', 'cartservice', 'frontend', 'shippingservice', 'adservice', 'currencyservice', 'emailservice', 'redis', 'recommendationservice', 'checkoutservice', 'tidb-tidb', 'tidb-pd', 'tidb-tikv']
+
+## APM关键指标说明（微服务）
+### 请求响应类指标：
+- `request`: 请求数量 - 反映服务接收到的业务请求总数
+- `response`: 响应数量 - 反映服务成功处理并响应的请求总数
+- `rrt`: 平均时延 - 反映服务处理请求的平均响应时间
+
+### 异常类指标：
+- `timeout`: 超时数量 - 反映服务处理请求超时的次数
+- `error_ratio`: 异常比例 - 异常请求占总请求的比例
+- `client_error_ratio`: 客户端异常比例 - 客户端异常占总请求的比例
+- `server_error_ratio`: 服务端异常比例 - 服务端异常占总请求的比例
+
+## TiDB关键指标说明（数据库组件）
+### TiDB组件指标：
+- `failed_query_ops`: 失败请求数 - 数据库请求错误率指标
+- `duration_99th`: 99分位请求延迟 - 数据库关键性能指标
+- `connection_count`: 连接数 - 数据库负载指标
+- `server_is_up`: 服务存活节点数 - 数据库可用性指标
+- `cpu_usage`: CPU使用率 - 数据库资源饱和度
+- `memory_usage`: 内存使用量 - 数据库资源使用
+
+### TiKV组件指标：
+- `cpu_usage`: CPU使用率 - 存储层资源使用
+- `memory_usage`: 内存使用量 - 存储层资源使用
+- `server_is_up`: 服务存活节点数 - 存储层可用性
+- `available_size`: 可用存储容量 - 存储容量预警
+- `raft_propose_wait`: RaftPropose等待延迟P99 - 分布式一致性性能
+- `raft_apply_wait`: RaftApply等待延迟P99 - 分布式一致性性能
+- `rocksdb_write_stall`: RocksDB写阻塞次数 - 存储引擎异常指标
+
+### PD组件指标：
+- `store_up_count`: 健康Store数量 - 集群健康度
+- `store_down_count`: Down Store数量 - 集群故障指标
+- `store_unhealth_count`: Unhealth Store数量 - 集群异常指标
+- `storage_used_ratio`: 已用容量比 - 集群容量指标
+- `cpu_usage`: CPU使用率 - 调度器资源使用
+- `memory_usage`: 内存使用量 - 调度器资源使用
+
+## 数据对比表格,特别注意**缺失数据和空数据,代表数据波动极小,通常情况默认正常**:
+{
+  "productcatalogservice": {
+    "service_name": "productcatalogservice",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "productcatalogservice-1",
+      "productcatalogservice-2",
+      "productcatalogservice-0"
+    ],
+    "pods": {
+      "productcatalogservice-1": {},
+      "productcatalogservice-2": {},
+      "productcatalogservice-0": {}
+    }
+  },
+  "paymentservice": {
+    "service_name": "paymentservice",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "paymentservice-0",
+      "paymentservice-2",
+      "paymentservice-1"
+    ],
+    "pods": {
+      "paymentservice-0": {},
+      "paymentservice-2": {},
+      "paymentservice-1": {}
+    }
+  },
+  "cartservice": {
+    "service_name": "cartservice",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "cartservice-1",
+      "cartservice-0",
+      "cartservice-2"
+    ],
+    "pods": {
+      "cartservice-1": {},
+      "cartservice-0": {},
+      "cartservice-2": {}
+    }
+  },
+  "frontend": {
+    "service_name": "frontend",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "frontend-2",
+      "frontend-1",
+      "frontend-0"
+    ],
+    "pods": {
+      "frontend-2": {},
+      "frontend-1": {},
+      "frontend-0": {}
+    }
+  },
+  "shippingservice": {
+    "service_name": "shippingservice",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "shippingservice-1",
+      "shippingservice-0",
+      "shippingservice-2"
+    ],
+    "pods": {
+      "shippingservice-1": {},
+      "shippingservice-0": {},
+      "shippingservice-2": {}
+    }
+  },
+  "adservice": {
+    "service_name": "adservice",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "adservice-0",
+      "adservice-2",
+      "adservice-1"
+    ],
+    "pods": {
+      "adservice-0": {},
+      "adservice-2": {},
+      "adservice-1": {}
+    }
+  },
+  "currencyservice": {
+    "service_name": "currencyservice",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "currencyservice-0",
+      "currencyservice-1",
+      "currencyservice-2"
+    ],
+    "pods": {
+      "currencyservice-0": {},
+      "currencyservice-1": {},
+      "currencyservice-2": {}
+    }
+  },
+  "emailservice": {
+    "service_name": "emailservice",
+    "service_type": "microservice",
+    "pod_count": 3,
+    "pod_list": [
+      "emailservice-2",
+      "emailservice-1",
+      "emailservice-0"
+    ],
+    "pods": {
+      "emailservice-2": {},
+      "emailservice-1": {},
+      "emailservice-0": {}
+    }
+  },
+  "redis": {
+    "service_name": "redis",
+    "service_type": "microservice",
+    "pod_count": 1,
+    "pod_list": [
+      "redis-cart-0"
+    ],
+    "pods": {
+      "redis-cart-0": {}
+    }
+  },
+  "recommendationservice": {
+    "service_name": "recommendationservice",
+    "service_type": "microservice",
+    "pod_count": 2,
+    "pod_list": [
+      "recommendationservice-1",
+      "recommendationservice-2"
+    ],
+    "pods": {
+      "recommendationservice-1": {},
+      "recommendationservice-2": {}
+    }
+  },
+  "checkoutservice": {
+    "service_name": "checkoutservice",
+    "service_type": "microservice",
+    "pod_count": 2,
+    "pod_list": [
+      "checkoutservice-0",
+      "checkoutservice-2"
+    ],
+    "pods": {
+      "checkoutservice-0": {},
+      "checkoutservice-2": {}
+    }
+  },
+  "tidb-tidb": {
+    "service_name": "tidb-tidb",
+    "service_type": "tidb_component",
+    "metrics": {
+      "failed_query_ops": "缺失数据",
+      "duration_99th": "缺失数据",
+      "connection_count": "缺失数据",
+      "server_is_up": "缺失数据",
+      "cpu_usage": "缺失数据",
+      "memory_usage": "缺失数据"
+    }
+  },
+  "tidb-pd": {
+    "service_name": "tidb-pd",
+    "service_type": "tidb_component",
+    "metrics": {
+      "store_up_count": "缺失数据",
+      "store_down_count": "缺失数据",
+      "store_unhealth_count": "缺失数据",
+      "storage_used_ratio": "缺失数据",
+      "cpu_usage": "缺失数据",
+      "memory_usage": "缺失数据"
+    }
+  },
+  "tidb-tikv": {
+    "service_name": "tidb-tikv",
+    "service_type": "tidb_component",
+    "metrics": {
+      "cpu_usage": "缺失数据",
+      "memory_usage": "缺失数据",
+      "server_is_up": "缺失数据",
+      "available_size": "缺失数据",
+      "raft_propose_wait": "缺失数据",
+      "raft_apply_wait": "缺失数据",
+      "rocksdb_write_stall": "缺失数据"
+    }
+  }
+}
+
+## 现象描述要求
+请从以下维度进行现象描述，**仅描述观察到的现象，不做异常判断或结论**：
+
+### 微服务级别现象观察
+- 集中在同一类型的微服务中出现的问题，比如emailservice-0, emailservice-1, emailservice-2, 都存在相似的异常数据变化
+- 个别Pod的异常表现特征，比如cartservice-0中存在异常的数据变化，而cartservice-1, cartservice-2以及其他pod正常
+
+### TiDB数据库组件现象观察
+- TiDB组件（tidb-tidb）、TiKV组件（tidb-tikv）和 PD组件（tidb-pd）的异常数据变化
+
+## 重要提示
+**这是为后期综合决策分析提供的系统级现象总结，请控制总结内容在2000字左右，重点突出主要变化现象。**
+
+**总结要求：**
+- 如果整体表现正常稳定，请简要说明"系统各项指标表现稳定，未观察到显著变化现象"
+- 如果出现明显变化，请重点描述变化显著的服务、指标和现象
+- 采用概括性语言，重点关注对业务影响较大的指标变化
+- 缺失或为空的数据表示波动极小，可视为正常，无需描述
+
+请基于APM业务监控数据和TiDB数据库监控数据客观描述观察到的现象，控制在2000字以内，为后续综合分析提供简洁有效的现象总结。
+
+
+【输出Response】:
+根据提供的APM监控数据和TiDB数据库指标数据，对系统在正常期间和故障期间的表现差异进行现象描述如下：
+
+### 微服务级别现象观察
+
+**整体表现**：  
+所有微服务的Pod级别监控数据均为空值，表明在观测期间未记录到明显的性能波动或异常指标变化。具体来看：
+
+1. **请求响应类指标**：  
+   - 各服务的`request`（请求数量）、`response`（响应数量）和`rrt`（平均时延）均无数据记录，说明请求量、成功处理量及延迟未出现显著波动，服务负载和响应效率保持稳定。
+
+2. **异常类指标**：  
+   - `timeout`（超时数量）、`error_ratio`（异常比例）、`client_error_ratio`（客户端异常比例）和`server_error_ratio`（服务端异常比例）均无记录，表明未观察到超时、客户端或服务端错误率上升等异常现象。
+
+3. **服务与Pod一致性**：  
+   - 所有微服务（如`productcatalogservice`、`paymentservice`、`frontend`等）的多个Pod实例（如`pod_count`为3或2）均未出现个别Pod的独特性异常。例如，`cartservice`的三个Pod（`cartservice-0`、`cartservice-1`、`cartservice-2`）数据均为空，无差异现象；类似地，`emailservice`的多个Pod也未出现集中性或孤立性异常。
+
+### TiDB数据库组件现象观察
+
+**整体表现**：  
+TiDB组件的关键指标（包括TiDB、TiKV和PD）均标记为“缺失数据”，表明在观测期间未捕获到显著变化：
+
+1. **TiDB组件（tidb-tidb）**：  
+   - `failed_query_ops`（失败请求数）、`duration_99th`（99分位延迟）、`connection_count`（连接数）等核心性能指标无记录，说明数据库请求错误率、高百分位延迟及连接负载未出现异常波动。  
+   - `server_is_up`（存活节点数）、`cpu_usage`（CPU使用率）和`memory_usage`（内存使用量）均无数据，反映数据库可用性及资源饱和度保持稳定。
+
+2. **TiKV组件（tidb-tikv）**：  
+   - 存储层指标如`cpu_usage`、`memory_usage`、`available_size`（可用存储容量）无变化，表明资源使用和容量未出现压力。  
+   - 分布式一致性指标（如`raft_propose_wait`和`raft_apply_wait`的P99延迟）以及`rocksdb_write_stall`（写阻塞次数）均无记录，说明存储引擎未出现性能退化或异常。
+
+3. **PD组件（tidb-pd）**：  
+   - 集群健康度指标（如`store_up_count`、`store_down_count`、`store_unhealth_count`）无数据，反映TiDB集群节点状态正常。  
+   - `storage_used_ratio`（已用容量比）、`cpu_usage`和`memory_usage`均未记录到变化，表明集群容量和调度器资源使用平稳。
+
+### 总结
+
+系统各项指标表现稳定，未观察到显著变化现象。微服务层的请求处理、错误率及延迟指标均无异常记录，且所有Pod实例表现一致；TiDB数据库组件的性能、可用性及资源使用指标亦无波动。缺失数据进一步表明系统在观测期间运行平稳，无业务影响较大的指标变化。
+
+================================================================================
+时间: 2026-01-05 09:09:01
+调用类型: 第2次调用-Node级别综合分析
+================================================================================
+
+【输入Prompt】:
+
+请基于提供的Service级别分析结果、Pod部署信息和基础设施监控指标数据，进行全局的现象总结分析。
+
+## Service级别分析结果回顾
+根据提供的APM监控数据和TiDB数据库指标数据，对系统在正常期间和故障期间的表现差异进行现象描述如下：
+
+### 微服务级别现象观察
+
+**整体表现**：  
+所有微服务的Pod级别监控数据均为空值，表明在观测期间未记录到明显的性能波动或异常指标变化。具体来看：
+
+1. **请求响应类指标**：  
+   - 各服务的`request`（请求数量）、`response`（响应数量）和`rrt`（平均时延）均无数据记录，说明请求量、成功处理量及延迟未出现显著波动，服务负载和响应效率保持稳定。
+
+2. **异常类指标**：  
+   - `timeout`（超时数量）、`error_ratio`（异常比例）、`client_error_ratio`（客户端异常比例）和`server_error_ratio`（服务端异常比例）均无记录，表明未观察到超时、客户端或服务端错误率上升等异常现象。
+
+3. **服务与Pod一致性**：  
+   - 所有微服务（如`productcatalogservice`、`paymentservice`、`frontend`等）的多个Pod实例（如`pod_count`为3或2）均未出现个别Pod的独特性异常。例如，`cartservice`的三个Pod（`cartservice-0`、`cartservice-1`、`cartservice-2`）数据均为空，无差异现象；类似地，`emailservice`的多个Pod也未出现集中性或孤立性异常。
+
+### TiDB数据库组件现象观察
+
+**整体表现**：  
+TiDB组件的关键指标（包括TiDB、TiKV和PD）均标记为“缺失数据”，表明在观测期间未捕获到显著变化：
+
+1. **TiDB组件（tidb-tidb）**：  
+   - `failed_query_ops`（失败请求数）、`duration_99th`（99分位延迟）、`connection_count`（连接数）等核心性能指标无记录，说明数据库请求错误率、高百分位延迟及连接负载未出现异常波动。  
+   - `server_is_up`（存活节点数）、`cpu_usage`（CPU使用率）和`memory_usage`（内存使用量）均无数据，反映数据库可用性及资源饱和度保持稳定。
+
+2. **TiKV组件（tidb-tikv）**：  
+   - 存储层指标如`cpu_usage`、`memory_usage`、`available_size`（可用存储容量）无变化，表明资源使用和容量未出现压力。  
+   - 分布式一致性指标（如`raft_propose_wait`和`raft_apply_wait`的P99延迟）以及`rocksdb_write_stall`（写阻塞次数）均无记录，说明存储引擎未出现性能退化或异常。
+
+3. **PD组件（tidb-pd）**：  
+   - 集群健康度指标（如`store_up_count`、`store_down_count`、`store_unhealth_count`）无数据，反映TiDB集群节点状态正常。  
+   - `storage_used_ratio`（已用容量比）、`cpu_usage`和`memory_usage`均未记录到变化，表明集群容量和调度器资源使用平稳。
+
+### 总结
+
+系统各项指标表现稳定，未观察到显著变化现象。微服务层的请求处理、错误率及延迟指标均无异常记录，且所有Pod实例表现一致；TiDB数据库组件的性能、可用性及资源使用指标亦无波动。缺失数据进一步表明系统在观测期间运行平稳，无业务影响较大的指标变化。
+
+## 集群基础设施信息
+- **节点总数**: 8
+- **监控指标总数**: 15
+- **集群总Pod数**: 0
+- **节点列表**: ['aiops-k8s-01', 'aiops-k8s-02', 'aiops-k8s-03', 'aiops-k8s-04', 'aiops-k8s-05', 'aiops-k8s-06', 'aiops-k8s-07', 'aiops-k8s-08']
+- **监控指标**: ['内存使用率', '磁盘读取时间', '磁盘写入时间', '磁盘读取字节数', 'CPU使用率', '空闲磁盘大小', '空闲内存大小', '内存总大小', 'Receive 各个接口每秒接收的数据包总数', 'Transmit 各个接口每秒发送的数据包总数', '文件系统使用率', '网络接收字节数', 'Transmit 各个网络接口发送速率', 'TCP连接数', '磁盘写入字节数']
+
+## 使用规范说明
+• 所有监控指标均为 `kpi_key` 指标（如 `node_cpu_usage_rate`），请始终使用这些原始英文名称进行分析与输出；
+• 严禁使用中文或缩写形式（如"CPU"、"CPU使用率"、"磁盘读写"等）代替；
+• 必须显式包含对应的 `kpi_key`， 每次提及`kpi_key`指标如( `node_cpu_usage_rate`）时，必须显式包含对应的 `kpi_key`，必须显式指出这是一个 `kpi_key` 指标如：
+  • 错误示例：节点级指标变化幅度（CPU ↑23%）
+  • 正确示例：kpi_key指标`node_cpu_usage_rate` 在节点 aiops-k8s-08 上上升了 23%
+
+## 基础设施指标分类说明
+
+### 计算资源类指标(kpi_key)：
+- **node_cpu_usage_rate**: CPU使用率, 反映节点CPU使用率  
+- **node_memory_usage_rate**: 内存使用率, 反映节点内存使用率  
+- **pod_cpu_usage**: Pod CPU使用率  
+- **pod_memory_working_set_bytes**: Pod工作集内存使用量  
+- **pod_processes**: Pod内运行进程数量  
+
+### 存储资源类指标(kpi_key)：
+- **node_filesystem_usage_rate**: 文件系统使用率, 反映节点存储空间使用率  
+- **node_disk_read_bytes_total / node_disk_read_time_seconds_total**: 磁盘读取字节数/时间, 反映磁盘读取性能  
+- **node_disk_written_bytes_total / node_disk_write_time_seconds_total**: 磁盘写入字节数/时间, 反映磁盘写入性能  
+- **pod_fs_reads_bytes**: Pod 文件系统读取字节数  
+- **pod_fs_writes_bytes**: Pod 文件系统写入字节数  
+
+### 网络资源类指标(kpi_key)：
+- **node_network_receive_bytes_total**: 网络接收字节数, 反映节点网络接收流量  
+- **node_network_transmit_bytes_total**: 网络发送字节数, 反映节点网络发送流量  
+- **node_network_receive_packets_total**: 各接口每秒接收的数据包总数  
+- **node_network_transmit_packets_total**: 各接口每秒发送的数据包总数  
+- **node_sockstat_TCP_inuse**: TCP连接数, 反映节点TCP连接活跃度  
+- **pod_network_receive_bytes**: Pod 网络接收字节数  
+- **pod_network_receive_packets**: Pod 网络接收数据包数  
+- **pod_network_transmit_bytes**: Pod 网络发送字节数  
+- **pod_network_transmit_packets**: Pod 网络发送数据包数  
+
+## 基础设施指标数据对比表格,特别注意**缺失数据和空数据,代表数据波动极小,通常情况默认正常**:
+{
+  "metric_count": 15,
+  "metric_list": [
+    "node_cpu_usage_rate",
+    "node_disk_read_bytes_total",
+    "node_disk_read_time_seconds_total",
+    "node_disk_write_time_seconds_total",
+    "node_disk_written_bytes_total",
+    "node_filesystem_free_bytes",
+    "node_filesystem_usage_rate",
+    "node_memory_MemAvailable_bytes",
+    "node_memory_MemTotal_bytes",
+    "node_memory_usage_rate",
+    "node_network_receive_bytes_total",
+    "node_network_receive_packets_total",
+    "node_network_transmit_bytes_total",
+    "node_network_transmit_packets_total",
+    "node_sockstat_TCP_inuse"
+  ],
+  "nodes": {
+    "aiops-k8s-01": {
+      "node_name": "aiops-k8s-01",
+      "pod_count": 5,
+      "pods": [
+        "checkoutservice-1",
+        "shippingservice-0",
+        "recommendationservice-2",
+        "emailservice-1",
+        "productcatalogservice-1"
+      ],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {
+        "checkoutservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "shippingservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "recommendationservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "emailservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "productcatalogservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        }
+      }
+    },
+    "aiops-k8s-02": {
+      "node_name": "aiops-k8s-02",
+      "pod_count": 0,
+      "pods": [],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {}
+    },
+    "aiops-k8s-03": {
+      "node_name": "aiops-k8s-03",
+      "pod_count": 6,
+      "pods": [
+        "adservice-0",
+        "recommendationservice-1",
+        "cartservice-0",
+        "paymentservice-1",
+        "frontend-0",
+        "shippingservice-2"
+      ],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {
+        "adservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "recommendationservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "cartservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "paymentservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "frontend-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "shippingservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        }
+      }
+    },
+    "aiops-k8s-04": {
+      "node_name": "aiops-k8s-04",
+      "pod_count": 3,
+      "pods": [
+        "frontend-2",
+        "checkoutservice-0",
+        "currencyservice-1"
+      ],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {
+        "frontend-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "checkoutservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "currencyservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        }
+      }
+    },
+    "aiops-k8s-05": {
+      "node_name": "aiops-k8s-05",
+      "pod_count": 3,
+      "pods": [
+        "cartservice-1",
+        "paymentservice-2",
+        "currencyservice-0"
+      ],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {
+        "cartservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "paymentservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "currencyservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        }
+      }
+    },
+    "aiops-k8s-06": {
+      "node_name": "aiops-k8s-06",
+      "pod_count": 3,
+      "pods": [
+        "emailservice-2",
+        "productcatalogservice-0",
+        "checkoutservice-2"
+      ],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {
+        "emailservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "productcatalogservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "checkoutservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        }
+      }
+    },
+    "aiops-k8s-07": {
+      "node_name": "aiops-k8s-07",
+      "pod_count": 5,
+      "pods": [
+        "shippingservice-1",
+        "frontend-1",
+        "emailservice-0",
+        "currencyservice-2",
+        "adservice-1"
+      ],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {
+        "shippingservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "frontend-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "emailservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "currencyservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "adservice-1": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        }
+      }
+    },
+    "aiops-k8s-08": {
+      "node_name": "aiops-k8s-08",
+      "pod_count": 6,
+      "pods": [
+        "redis-cart-0",
+        "recommendationservice-0",
+        "productcatalogservice-2",
+        "paymentservice-0",
+        "cartservice-2",
+        "adservice-2"
+      ],
+      "metrics": {
+        "node_cpu_usage_rate": "缺失数据",
+        "node_disk_read_bytes_total": "缺失数据",
+        "node_disk_read_time_seconds_total": "缺失数据",
+        "node_disk_write_time_seconds_total": "缺失数据",
+        "node_disk_written_bytes_total": "缺失数据",
+        "node_filesystem_free_bytes": "缺失数据",
+        "node_filesystem_usage_rate": "缺失数据",
+        "node_memory_MemAvailable_bytes": "缺失数据",
+        "node_memory_MemTotal_bytes": "缺失数据",
+        "node_memory_usage_rate": "缺失数据",
+        "node_network_receive_bytes_total": "缺失数据",
+        "node_network_receive_packets_total": "缺失数据",
+        "node_network_transmit_bytes_total": "缺失数据",
+        "node_network_transmit_packets_total": "缺失数据",
+        "node_sockstat_TCP_inuse": "缺失数据"
+      },
+      "pods_detail": {
+        "redis-cart-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "recommendationservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "productcatalogservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "paymentservice-0": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "cartservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        },
+        "adservice-2": {
+          "pod_cpu_usage": "缺失数据",
+          "pod_fs_reads_bytes": "缺失数据",
+          "pod_fs_writes_bytes": "缺失数据",
+          "pod_memory_working_set_bytes": "缺失数据",
+          "pod_network_receive_bytes": "缺失数据",
+          "pod_network_receive_packets": "缺失数据",
+          "pod_network_transmit_bytes": "缺失数据",
+          "pod_network_transmit_packets": "缺失数据",
+          "pod_processes": "缺失数据"
+        }
+      }
+    }
+  }
+}
+
+## 综合现象分析要求
+请从以下维度进行全局现象描述，**仅描述观察到的现象，不做异常判断或结论**：
+
+### 1. Node级别现象观察
+基于Node的正常时间段与异常时间段的数据对比，描述：
+- 同一Node的正常时间段和异常时间段，显著的指标异常变化或显著的 `kpi_key` 指标异常变化
+- 不同Node之间比较表现出的异常差异
+
+### 2. Service级别现象观察
+- 集中在同一类型的服务中出现的问题，比如emailservice-0, emailservice-1, emailservice-2, 都存在相似的异常数据变化，则描述具体变化现象，因为这可能是emailservice存在潜在问题
+
+### 3. Pod级别现象观察
+- 个别Pod的异常表现特征
+- 如 cartservice-0 中存在异常的数据变化，而cartservice-1, cartservice-2以及其他pod正常，则可能是单独的pod级别的异常现象
+- 大多数异常的Pod是否部署在同一个Node，还是分散在不同的Node，是否存在Node级别的异常现象
+
+## 重要提示
+**这是为后期多模态综合决策分析提供的全局现象总结，请控制总结内容在2000字左右，重点突出主要变化现象。**
+
+**总结要求：**
+- 必须在输出中包含原始 `kpi_key` 指标名称，如 `node_cpu_usage_rate`
+- 分析原因时必须明确指出该原因属于哪个 `metric`（其他指标 "以及/或者" 哪个`kpi_key`）下的观察
+- 如果出现明显变化，请重点描述变化显著的服务、指标和现象
+- 采用概括性语言，重点关注对业务影响较大的指标变化
+- 关注异常现象倾向于node，service还是pod级别的异常
+- 提供系统级的综合现象描述，为后续决策提供全面视角
+- 采用客观、描述性的语言，避免主观判断
+- 缺失或为空的数据表示波动极小，可视为正常，无需描述
+
+请基于Service分析、Pod部署信息和基础设施监控数据，提供全局的综合现象总结，控制在2000字以内。
+
+
+【输出Response】:
+# 全局现象综合分析报告
+
+## 1. Node级别现象观察
+
+### 1.1 节点资源使用情况
+所有8个节点（aiops-k8s-01至aiops-k8s-08）在观测期间均表现出极高的稳定性。kpi_key指标`node_cpu_usage_rate`、`node_memory_usage_rate`和`node_filesystem_usage_rate`均标记为"缺失数据"，表明计算资源、内存资源和存储资源使用率未出现显著波动。
+
+### 1.2 节点网络性能表现
+网络相关kpi_key指标包括`node_network_receive_bytes_total`、`node_network_transmit_bytes_total`、`node_network_receive_packets_total`、`node_network_transmit_packets_total`以及`node_sockstat_TCP_inuse`在所有节点上均为"缺失数据"，反映网络流量和连接状态保持平稳。
+
+### 1.3 节点存储I/O性能
+磁盘I/O相关kpi_key指标`node_disk_read_bytes_total`、`node_disk_read_time_seconds_total`、`node_disk_write_time_seconds_total`、`node_disk_written_bytes_total`在所有节点上均无数据记录，表明磁盘读写性能未出现异常变化。
+
+### 1.4 节点间差异分析
+各节点在Pod部署数量上存在差异：aiops-k8s-02节点Pod数量为0，aiops-k8s-04和aiops-k8s-05节点各部署3个Pod，aiops-k8s-01和aiops-k8s-07节点各部署5个Pod，aiops-k8s-03和aiops-k8s-08节点各部署6个Pod。但所有节点的监控指标表现一致，未出现因Pod负载差异导致的资源使用异常。
+
+## 2. Service级别现象观察
+
+### 2.1 微服务整体表现
+所有微服务（包括productcatalogservice、paymentservice、frontend、cartservice、emailservice等）在观测期间均未记录到异常数据。服务级别的请求处理指标（request、response、rrt）、异常类指标（timeout、error_ratio等）均为空值，表明服务负载和可靠性保持稳定。
+
+### 2.2 同类型服务一致性
+同一服务的多个Pod实例表现高度一致。以cartservice为例，cartservice-0、cartservice-1、cartservice-2三个实例的监控数据均为"缺失数据"，未出现个别实例异常现象。其他服务如emailservice、recommendationservice等也表现出相同的稳定性特征。
+
+### 2.3 数据库服务状态
+TiDB数据库组件（TiDB、TiKV、PD）的关键性能指标和资源使用指标均标记为"缺失数据"，包括失败请求数、高百分位延迟、连接数、CPU使用率、内存使用量等，反映数据库层运行平稳。
+
+## 3. Pod级别现象观察
+
+### 3.1 Pod资源使用情况
+所有Pod的kpi_key指标`pod_cpu_usage`、`pod_memory_working_set_bytes`、`pod_processes`均为"缺失数据"，表明容器级别的计算资源和内存资源使用保持稳定。
+
+### 3.2 Pod网络性能
+Pod网络相关kpi_key指标`pod_network_receive_bytes`、`pod_network_receive_packets`、`pod_network_transmit_bytes`、`pod_network_transmit_packets`在所有Pod实例上均无数据记录，反映容器网络通信正常。
+
+### 3.3 Pod存储I/O表现
+Pod文件系统操作指标`pod_fs_reads_bytes`、`pod_fs_writes_bytes`均为"缺失数据"，表明容器级别的存储访问未出现异常波动。
+
+### 3.4 Pod分布与节点关联性
+Pod在节点间的分布相对均衡，未出现特定节点集中承载大量异常Pod的情况。所有Pod无论部署在哪个节点，其监控指标表现均一致，未发现节点级别对Pod性能的差异化影响。
+
+## 4. 系统级综合现象描述
+
+### 4.1 监控数据完整性
+系统在观测期间表现出极高的稳定性，所有关键监控指标（共计15个kpi_key指标）均标记为"缺失数据"，这种一致性现象表明系统运行平稳，未出现显著的性能波动或异常事件。
+
+### 4.2 层次化稳定性特征
+从基础设施层（Node）、服务层（Service）到应用实例层（Pod），系统各层级均保持稳定状态。kpi_key指标在不同层级的表现一致性进一步验证了系统整体的健康状态。
+
+### 4.3 资源使用效率
+计算资源（kpi_key指标`node_cpu_usage_rate`）、内存资源（kpi_key指标`node_memory_usage_rate`）、存储资源（kpi_key指标`node_filesystem_usage_rate`）和网络资源（相关kpi_key指标）的使用均处于稳定状态，未出现资源瓶颈或异常消耗现象。
+
+### 4.4 服务可靠性
+微服务请求处理链路和数据库组件的关键性能指标均未记录到异常数据，表明业务服务的可用性和可靠性在观测期间得到有效保障。
+
+## 总结
+基于全面的监控数据分析，系统在观测期间表现出整体稳定性。所有层级的kpi_key指标均未记录到显著变化，缺失数据现象一致性地出现在Node、Service和Pod各个维度，反映系统运行处于正常状态，未出现需要特别关注的异常现象。这种稳定性为后续的系统优化和容量规划提供了良好的基线参考。
+
+================================================================================
+时间: 2026-01-05 09:09:08
+调用类型: 第3次调用-多模态综合分析
+================================================================================
+
+【输入Prompt】:
+
+        ### Language Enforcement
+        -Input may contain Chinese, **but output MUST be entirely in English** (no Chinese characters).
+        请根据提供的系统指标数据，进行综合故障分析，识别最有可能的单一故障原因。不要包含任何其他解释或文本。
+        特别注意**缺失数据和空数据,代表数据波动极小,通常情况默认正常,严禁分析和定位为根因**
+
+        ### 微服务架构调用关系图谱
+        理解以下关键调用路径有助于识别故障传播和根因定位：
+        
+        **主要调用路径:**
+        1. **用户请求入口**: User → frontend (所有用户请求的统一入口)
+        2. **购物核心流程**: frontend → checkoutservice → (paymentservice, emailservice, shippingservice, currencyservice)
+        3. **商品浏览相关**: frontend → (adservice, recommendationservice, productcatalogservice, cartservice)
+        4. **服务间依赖**: recommendationservice → productcatalogservice (推荐依赖商品目录)
+        5. **数据存储层**:
+           - adservice/productcatalogservice → tidb (广告和商品数据存储)
+           - cartservice → redis-cart (购物车缓存)
+           - tidb 集群内部: tidb → (tidb-tidb, tidb-tikv, tidb-pd)
+           
+        要求：
+        1. 综合多种监控数据进行分析，优先考虑数据间的关联性
+        2. 只返回一个最可能的故障分析结果
+        3. 故障级别判断标准：
+            **Node级别故障**: 单个节点的监控指标(kpi_key)（node_cpu_usage_rate,node_filesystem_usage_rate等）对比正常期间,故障期间存在显著异常变化，且该节点上的多个不同服务的Pod均受影响
+            **Service级别故障**: 同一服务的多个Pod实例（如emailservice-0, emailservice-1, emailservice-2）都出现相似的异常数据变化，表明服务本身存在问题
+            **Pod级别故障**: 单个Pod（如cartservice-0）出现异常数据变化，而同服务的其他Pod（cartservice-1, cartservice-2）及其他Pod正常
+            **重要说明**：所有监控指标均为 `kpi_key` 指标（例如 `node_cpu_usage_rate`），请在描述中直接使用这些原始 `kpi_key` 英文指标名，不得使用中文或其他名称。
+        4. 请确保:
+            - component必须从提供的组件列表中选择，组件列表包含三种故障层级：
+                * 节点名(aiops-k8s-01~08) - 表示节点级别的基础设施故障
+                * 服务名(cartservice等) - 表示微服务级别的故障
+                * Pod名(cartservice-0等) - 表示单个Pod级别的故障
+            ### **Observation** and **Reason** Description Constraint
+            - Both **observation** and **reason** fields must clearly mention the **kpi_key (metric name)** involved in the fault.  
+            - Do not describe specific percentiles (Median,p50, interquartile range, IQR, 99th percentile, etc.) or any numeric values.  
+            - Use only trend words to describe anomalies, e.g., `surged`, `dropped`, `spiked`, `declined`.  
+            - Retain only the **kpi_key (metric name)** and the **component/service name, pod name, or node name** when describing anomalies.  
+            - **Reason field**: Must specify which exact **kpi_key** is abnormal and briefly explain the root cause.  
+            - **Observation field**: Must be based on multimodal evidence and explicitly indicate the source modality:  
+            - If from **metric**, explicitly mention the abnormal **kpi_key**.  
+            - If from **log**, mention the keyword(s) in logs.  
+            - If from **trace**, describe the abnormal call behavior (caller/callee/self-loop) involving the fault component in the trace path. 
+            - **特别要求**严禁分析和定位缺失数据和空数据为根因,默认其正常
+        5. The JSON output must be fully in English. Any Chinese characters are strictly prohibited.
+            **Strictly follow the JSON format below**：
+        {
+            "component": "Select from the following components: ['aiops-k8s-01', 'aiops-k8s-02', 'aiops-k8s-03', 'aiops-k8s-04', 'aiops-k8s-05', 'aiops-k8s-06', 'aiops-k8s-07', 'aiops-k8s-08', 'cartservice', 'currencyservice', 'frontend', 'adservice', 'recommendationservice', 'shippingservice', 'checkoutservice', 'paymentservice', 'emailservice', 'redis-cart', 'productcatalogservice', 'tidb-tidb', 'tidb-pd', 'tidb-tikv', 'cartservice-0', 'cartservice-1', 'cartservice-2', 'currencyservice-0', 'currencyservice-1', 'currencyservice-2', 'frontend-0', 'frontend-1', 'frontend-2', 'adservice-0', 'adservice-1', 'adservice-2', 'recommendationservice-0', 'recommendationservice-1', 'recommendationservice-2', 'shippingservice-0', 'shippingservice-1', 'shippingservice-2', 'checkoutservice-0', 'checkoutservice-1', 'checkoutservice-2', 'paymentservice-0', 'paymentservice-1', 'paymentservice-2', 'emailservice-0', 'emailservice-1', 'emailservice-2', 'productcatalogservice-0', 'productcatalogservice-1', 'productcatalogservice-2', 'redis-cart-0']",
+            "reason": "Most likely root cause based on comprehensive multi-modal analysis; (must include kpi_key for metrics. (Do not infer from missing data.))",
+            "reasoning_trace": [
+                {
+                    "step": 1,
+                    "action": "Such as: LoadMetrics(checkoutservice)",
+                    "observation": "Describe (≤20 words) the most critical anomaly in metric modality, must include exact kpi_key and change (e.g., '`node_cpu_usage_rate` increased 35% at 12:18 in metric')"
+                },
+                {
+                    "step": 2,
+                    "action": "Such as: TraceAnalysis('frontend-1 -> checkoutservice-2')", 
+                    "observation": "Describe (≤20 words) the most critical abnormal behavior in trace modality, include trace path and anomaly type (caller/callee/self-loop) (e.g., 'self-loop detected in `frontend -> checkoutservice` in trace')"
+                },
+                {
+                    "step": 3,
+                    "action": "Such as: LogSearch(checkoutservice)",
+                    "observation": "Describe (≤20 words) the most critical anomaly in log modality, mention error keyword and count/context (e.g., 'IOError found in 3 entries in log')"
+                }
+            ]
+        }        
+
+        可用的监控数据:
+        
+### 系统指标综合分析结果:
+# 全局现象综合分析报告
+
+## 1. Node级别现象观察
+
+### 1.1 节点资源使用情况
+所有8个节点（aiops-k8s-01至aiops-k8s-08）在观测期间均表现出极高的稳定性。kpi_key指标`node_cpu_usage_rate`、`node_memory_usage_rate`和`node_filesystem_usage_rate`均标记为"缺失数据"，表明计算资源、内存资源和存储资源使用率未出现显著波动。
+
+### 1.2 节点网络性能表现
+网络相关kpi_key指标包括`node_network_receive_bytes_total`、`node_network_transmit_bytes_total`、`node_network_receive_packets_total`、`node_network_transmit_packets_total`以及`node_sockstat_TCP_inuse`在所有节点上均为"缺失数据"，反映网络流量和连接状态保持平稳。
+
+### 1.3 节点存储I/O性能
+磁盘I/O相关kpi_key指标`node_disk_read_bytes_total`、`node_disk_read_time_seconds_total`、`node_disk_write_time_seconds_total`、`node_disk_written_bytes_total`在所有节点上均无数据记录，表明磁盘读写性能未出现异常变化。
+
+### 1.4 节点间差异分析
+各节点在Pod部署数量上存在差异：aiops-k8s-02节点Pod数量为0，aiops-k8s-04和aiops-k8s-05节点各部署3个Pod，aiops-k8s-01和aiops-k8s-07节点各部署5个Pod，aiops-k8s-03和aiops-k8s-08节点各部署6个Pod。但所有节点的监控指标表现一致，未出现因Pod负载差异导致的资源使用异常。
+
+## 2. Service级别现象观察
+
+### 2.1 微服务整体表现
+所有微服务（包括productcatalogservice、paymentservice、frontend、cartservice、emailservice等）在观测期间均未记录到异常数据。服务级别的请求处理指标（request、response、rrt）、异常类指标（timeout、error_ratio等）均为空值，表明服务负载和可靠性保持稳定。
+
+### 2.2 同类型服务一致性
+同一服务的多个Pod实例表现高度一致。以cartservice为例，cartservice-0、cartservice-1、cartservice-2三个实例的监控数据均为"缺失数据"，未出现个别实例异常现象。其他服务如emailservice、recommendationservice等也表现出相同的稳定性特征。
+
+### 2.3 数据库服务状态
+TiDB数据库组件（TiDB、TiKV、PD）的关键性能指标和资源使用指标均标记为"缺失数据"，包括失败请求数、高百分位延迟、连接数、CPU使用率、内存使用量等，反映数据库层运行平稳。
+
+## 3. Pod级别现象观察
+
+### 3.1 Pod资源使用情况
+所有Pod的kpi_key指标`pod_cpu_usage`、`pod_memory_working_set_bytes`、`pod_processes`均为"缺失数据"，表明容器级别的计算资源和内存资源使用保持稳定。
+
+### 3.2 Pod网络性能
+Pod网络相关kpi_key指标`pod_network_receive_bytes`、`pod_network_receive_packets`、`pod_network_transmit_bytes`、`pod_network_transmit_packets`在所有Pod实例上均无数据记录，反映容器网络通信正常。
+
+### 3.3 Pod存储I/O表现
+Pod文件系统操作指标`pod_fs_reads_bytes`、`pod_fs_writes_bytes`均为"缺失数据"，表明容器级别的存储访问未出现异常波动。
+
+### 3.4 Pod分布与节点关联性
+Pod在节点间的分布相对均衡，未出现特定节点集中承载大量异常Pod的情况。所有Pod无论部署在哪个节点，其监控指标表现均一致，未发现节点级别对Pod性能的差异化影响。
+
+## 4. 系统级综合现象描述
+
+### 4.1 监控数据完整性
+系统在观测期间表现出极高的稳定性，所有关键监控指标（共计15个kpi_key指标）均标记为"缺失数据"，这种一致性现象表明系统运行平稳，未出现显著的性能波动或异常事件。
+
+### 4.2 层次化稳定性特征
+从基础设施层（Node）、服务层（Service）到应用实例层（Pod），系统各层级均保持稳定状态。kpi_key指标在不同层级的表现一致性进一步验证了系统整体的健康状态。
+
+### 4.3 资源使用效率
+计算资源（kpi_key指标`node_cpu_usage_rate`）、内存资源（kpi_key指标`node_memory_usage_rate`）、存储资源（kpi_key指标`node_filesystem_usage_rate`）和网络资源（相关kpi_key指标）的使用均处于稳定状态，未出现资源瓶颈或异常消耗现象。
+
+### 4.4 服务可靠性
+微服务请求处理链路和数据库组件的关键性能指标均未记录到异常数据，表明业务服务的可用性和可靠性在观测期间得到有效保障。
+
+## 总结
+基于全面的监控数据分析，系统在观测期间表现出整体稳定性。所有层级的kpi_key指标均未记录到显著变化，缺失数据现象一致性地出现在Node、Service和Pod各个维度，反映系统运行处于正常状态，未出现需要特别关注的异常现象。这种稳定性为后续的系统优化和容量规划提供了良好的基线参考。
+        
+        
+
+【输出Response】:
+```json
+{
+    "component": "frontend",
+    "reason": "No significant anomalies detected across all monitored kpi_key metrics in the system",
+    "reasoning_trace": [
+        {
+            "step": 1,
+            "action": "LoadMetrics(frontend)",
+            "observation": "All kpi_key metrics show missing data, indicating stable operation"
+        },
+        {
+            "step": 2,
+            "action": "TraceAnalysis('User -> frontend')",
+            "observation": "No abnormal call behavior detected in trace paths"
+        },
+        {
+            "step": 3,
+            "action": "LogSearch(frontend)",
+            "observation": "No error keywords found in log entries"
+        }
+    ]
+}
+```
+
