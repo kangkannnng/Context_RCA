@@ -54,8 +54,6 @@ graph TD
 
         Consensus -->|Challenge/Query| DC
         DC -->|Refined Evidence| Context
-
-        note[Loop until Verdict] -.-> Consensus
     end
 
     subgraph “Phase III: Reporting”
