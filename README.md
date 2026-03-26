@@ -40,28 +40,24 @@ Context-RCA 是一个基于大语言模型（LLM）和多智能体协作（Multi
 ```mermaid
 graph TD
     User((User Input)) --> Orch[Orchestrator Agent]
+    Orch -->|Dispatch| DC[Data Collection Agent]
 
-    subgraph “Phase I: Evidence Mining”
-        Orch -->|Dispatch| DC[Data Collection Agent]
-        DC -->|Parallel| M[Metric Agent]
-        DC -->|Parallel| L[Log Agent]
-        DC -->|Parallel| T[Trace Agent]
-    end
+    DC -->|Parallel| M[Metric Agent]
+    DC -->|Parallel| L[Log Agent]
+    DC -->|Parallel| T[Trace Agent]
 
-    subgraph “Phase II: Collaborative Reasoning”
-        M & L & T -->|Findings| Context[Shared Context]
-        Context --> Consensus[Consensus Agent]
+    M -->|Findings| Context[Shared Context]
+    L -->|Findings| Context
+    T -->|Findings| Context
 
-        Consensus -->|Challenge/Query| DC
-        DC -->|Refined Evidence| Context
-    end
+    Context --> Consensus[Consensus Agent]
+    Consensus -->|Challenge/Query| DC
+    DC -->|Refined Evidence| Context
 
-    subgraph “Phase III: Reporting”
-        Consensus -->|Final Verdict| Report[Report Agent]
-        Report --> Result[JSON Report]
-    end
+    Consensus -->|Final Verdict| Report[Report Agent]
+    Report --> Result[JSON Report]
 
-    classDef agent fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef agent fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     class Orch,M,L,T,Consensus,Report agent
 ```
 
