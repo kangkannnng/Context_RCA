@@ -1,0 +1,91 @@
+result_file,scope,fault_category,match_mode,n,component_hit,component_acc,keyword_hit,keyword_hit_rate,both_hit,both_hit_rate
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,overall,ALL,exact,400,93,23.25,115,28.75,43,10.75
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,dns fault,exact,21,4,19.0476,13,61.9048,4,19.0476
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,erroneous change,exact,21,2,9.5238,2,9.5238,1,4.7619
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,io fault,exact,28,0,0.0,24,85.7143,0,0.0
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,jvm fault,exact,55,25,45.4545,5,9.0909,2,3.6364
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,misconfiguration,exact,18,6,33.3333,13,72.2222,6,33.3333
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,network attack,exact,73,37,50.6849,41,56.1644,25,34.2466
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,node fault,exact,82,1,1.2195,1,1.2195,0,0.0
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,pod fault,exact,60,5,8.3333,16,26.6667,5,8.3333
+context_rca_result/2649-single-gpt4o/2649_single_gpt4o_result.jsonl,fault_category,stress test,exact,42,13,30.9524,0,0.0,0,0.0
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,overall,ALL,exact,400,124,31.0,113,28.25,48,12.0
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,dns fault,exact,21,6,28.5714,8,38.0952,2,9.5238
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,erroneous change,exact,21,9,42.8571,0,0.0,0,0.0
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,io fault,exact,28,0,0.0,21,75.0,0,0.0
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,jvm fault,exact,55,13,23.6364,6,10.9091,4,7.2727
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,misconfiguration,exact,18,11,61.1111,5,27.7778,2,11.1111
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,network attack,exact,73,51,69.863,24,32.8767,16,21.9178
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,node fault,exact,82,15,18.2927,21,25.6098,14,17.0732
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,pod fault,exact,60,6,10.0,17,28.3333,4,6.6667
+context_rca_result/3576-baseline-gpt4o/3576_baseline_gpt4o_result.jsonl,fault_category,stress test,exact,42,13,30.9524,11,26.1905,6,14.2857
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,overall,ALL,exact,400,135,33.75,138,34.5,59,14.75
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,dns fault,exact,21,2,9.5238,15,71.4286,2,9.5238
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,erroneous change,exact,21,6,28.5714,3,14.2857,0,0.0
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,io fault,exact,28,1,3.5714,28,100.0,1,3.5714
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,jvm fault,exact,55,30,54.5455,28,50.9091,15,27.2727
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,misconfiguration,exact,18,16,88.8889,7,38.8889,6,33.3333
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,network attack,exact,73,43,58.9041,35,47.9452,24,32.8767
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,node fault,exact,82,3,3.6585,0,0.0,0,0.0
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,pod fault,exact,60,11,18.3333,22,36.6667,11,18.3333
+context_rca_result/4515-single-ds/4515_single_ds_result.jsonl,fault_category,stress test,exact,42,23,54.7619,0,0.0,0,0.0
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,overall,ALL,exact,400,211,52.75,167,41.75,115,28.75
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,dns fault,exact,21,1,4.7619,8,38.0952,0,0.0
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,erroneous change,exact,21,12,57.1429,3,14.2857,1,4.7619
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,io fault,exact,28,2,7.1429,24,85.7143,2,7.1429
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,jvm fault,exact,55,30,54.5455,10,18.1818,9,16.3636
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,misconfiguration,exact,18,18,100.0,2,11.1111,2,11.1111
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,network attack,exact,73,65,89.0411,41,56.1644,38,52.0548
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,node fault,exact,82,31,37.8049,31,37.8049,28,34.1463
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,pod fault,exact,60,30,50.0,24,40.0,19,31.6667
+context_rca_result/5172-baseline/5172_baseline_ds_result.jsonl,fault_category,stress test,exact,42,22,52.381,24,57.1429,16,38.0952
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,overall,ALL,exact,400,259,64.75,203,50.75,179,44.75
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,dns fault,exact,21,10,47.619,12,57.1429,10,47.619
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,erroneous change,exact,21,15,71.4286,0,0.0,0,0.0
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,io fault,exact,28,23,82.1429,26,92.8571,23,82.1429
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,jvm fault,exact,55,38,69.0909,22,40.0,18,32.7273
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,misconfiguration,exact,18,16,88.8889,12,66.6667,12,66.6667
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,network attack,exact,73,69,94.5205,60,82.1918,58,79.4521
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,node fault,exact,82,37,45.122,37,45.122,35,42.6829
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,pod fault,exact,60,18,30.0,23,38.3333,12,20.0
+context_rca_result/6006-normal-gpt4o/6006_normal_gpt4o_result.jsonl,fault_category,stress test,exact,42,33,78.5714,11,26.1905,11,26.1905
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,overall,ALL,exact,400,240,60.0,232,58.0,183,45.75
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,dns fault,exact,21,9,42.8571,15,71.4286,9,42.8571
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,erroneous change,exact,21,9,42.8571,3,14.2857,1,4.7619
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,io fault,exact,28,20,71.4286,25,89.2857,20,71.4286
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,jvm fault,exact,55,44,80.0,43,78.1818,37,67.2727
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,misconfiguration,exact,18,17,94.4444,15,83.3333,15,83.3333
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,network attack,exact,73,53,72.6027,62,84.9315,47,64.3836
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,node fault,exact,82,31,37.8049,34,41.4634,31,37.8049
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,pod fault,exact,60,23,38.3333,22,36.6667,12,20.0
+context_rca_result/6042-no_select/6042_no_select_ds_result.jsonl,fault_category,stress test,exact,42,34,80.9524,13,30.9524,11,26.1905
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,overall,ALL,exact,400,265,66.25,226,56.5,195,48.75
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,dns fault,exact,21,7,33.3333,13,61.9048,6,28.5714
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,erroneous change,exact,21,12,57.1429,5,23.8095,4,19.0476
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,io fault,exact,28,26,92.8571,27,96.4286,26,92.8571
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,jvm fault,exact,55,42,76.3636,35,63.6364,31,56.3636
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,misconfiguration,exact,18,17,94.4444,12,66.6667,12,66.6667
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,network attack,exact,73,63,86.3014,64,87.6712,58,79.4521
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,node fault,exact,82,31,37.8049,30,36.5854,30,36.5854
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,pod fault,exact,60,29,48.3333,26,43.3333,15,25.0
+context_rca_result/6307-no_consenus/6307_no_consensus_ds_result.jsonl,fault_category,stress test,exact,42,38,90.4762,14,33.3333,13,30.9524
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,overall,ALL,exact,400,261,65.25,239,59.75,201,50.25
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,dns fault,exact,21,6,28.5714,13,61.9048,6,28.5714
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,erroneous change,exact,21,12,57.1429,5,23.8095,4,19.0476
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,io fault,exact,28,25,89.2857,27,96.4286,25,89.2857
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,jvm fault,exact,55,42,76.3636,39,70.9091,35,63.6364
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,misconfiguration,exact,18,15,83.3333,15,83.3333,15,83.3333
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,network attack,exact,73,60,82.1918,58,79.4521,52,71.2329
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,node fault,exact,82,36,43.9024,39,47.561,34,41.4634
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,pod fault,exact,60,28,46.6667,26,43.3333,13,21.6667
+context_rca_result/6380-no_sop/6380_no_sop_ds_result.jsonl,fault_category,stress test,exact,42,37,88.0952,17,40.4762,17,40.4762
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,overall,ALL,exact,400,281,70.25,234,58.5,203,50.75
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,dns fault,exact,21,6,28.5714,13,61.9048,5,23.8095
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,erroneous change,exact,21,17,80.9524,5,23.8095,4,19.0476
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,io fault,exact,28,26,92.8571,28,100.0,26,92.8571
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,jvm fault,exact,55,46,83.6364,41,74.5455,38,69.0909
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,misconfiguration,exact,18,17,94.4444,8,44.4444,8,44.4444
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,network attack,exact,73,65,89.0411,63,86.3014,58,79.4521
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,node fault,exact,82,34,41.4634,34,41.4634,32,39.0244
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,pod fault,exact,60,31,51.6667,26,43.3333,16,26.6667
+context_rca_result/6593-normal/6593_normal_ds_result.jsonl,fault_category,stress test,exact,42,39,92.8571,16,38.0952,16,38.0952
